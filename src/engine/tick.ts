@@ -72,7 +72,9 @@ function earliestDelivery(state: GameState, loc: ItemLocation): Day | undefined 
 /** Recompute proposals and planning exceptions for today. No time passes; no RNG used. */
 export function refresh(state: GameState, r: Rules = defaultRules): GameState {
   const { lines, exceptions: minExceptions } = applyVendorMinimums(state, generatePlanLines(state, r), r);
-  const proposals = lines.map((l) => l.proposal);
+  // Unfilled 'can' lines (qty 0) are planning detail, not proposals: a can item only
+  // appears once pulled in to meet a vendor minimum (reason 'vendor-min-fill').
+  const proposals = lines.map((l) => l.proposal).filter((p) => p.qty > 0);
   const exceptions: PlanningException[] = state.exceptions.filter((e) => EVENT_KINDS.has(e.kind));
 
   for (const p of proposals) {
@@ -83,7 +85,7 @@ export function refresh(state: GameState, r: Rules = defaultRules): GameState {
       itemId: p.itemId,
       depotId: p.depotId,
       vendorId: p.vendorId,
-      message: `Projected stock at D2 (day ${p.d2}) is ${round2(p.projectedAtD2)}, below the MOP of ${round2(p.mustOrderPoint)}.`,
+      message: `Projected stock at D2 (day ${p.d2}) is ${whole(p.projectedAtD2)}, below the MOP of ${whole(p.mustOrderPoint)}.`,
     });
   }
 
@@ -113,7 +115,7 @@ export function refresh(state: GameState, r: Rules = defaultRules): GameState {
     exceptions.push({
       kind: 'over-budget',
       day: state.today,
-      message: `Period ${period.index + 1}: committed ${round2(period.committed)} of ${period.allowance} silver allowance.`,
+      message: `Period ${period.index + 1}: committed ${whole(period.committed)} of ${whole(period.allowance)} silver allowance.`,
     });
   }
 
@@ -271,7 +273,7 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
         day: t,
         itemId: loc.itemId,
         depotId: loc.depotId,
-        message: `Actual demand ${demand} vs forecast ${round2(forecastToday)}.`,
+        message: `Actual demand ${demand} vs forecast ${whole(forecastToday)}.`,
       });
     }
     if (short > 0) {
@@ -319,7 +321,7 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
       events.push({
         kind: 'over-budget',
         day: t,
-        message: `Period ${period.index + 1} closed ${round2(overspend)} silver over allowance; the treasury docks next period.`,
+        message: `Period ${period.index + 1} closed ${whole(overspend)} silver over allowance; the treasury docks next period.`,
       });
     }
   }
@@ -348,6 +350,7 @@ function mean(xs: readonly number[]): number {
 function clamp(x: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, x));
 }
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
+/** Whole units / coins for message text (the UI shows messages verbatim). */
+function whole(n: number): number {
+  return Math.round(n);
 }

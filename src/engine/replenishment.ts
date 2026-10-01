@@ -193,6 +193,8 @@ export function generatePlanLines(state: GameState, r: Rules = defaultRules): Pl
   return lines;
 }
 
+/** Raw plan lines as proposals, including unfilled `can` lines (qty 0). Engine-internal; the
+ *  player-facing list is GameState.proposals from refresh(), which drops qty-0 lines. */
 export function generateProposals(state: GameState, r: Rules = defaultRules): OrderProposal[] {
   return generatePlanLines(state, r).map((l) => l.proposal);
 }
