@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { itemLocationStats } from '../../src/engine/masterData';
 import { generateProposals, planningParams, roundToPack } from '../../src/engine/replenishment';
 import { rules, zScore, type Rules } from '../../src/engine/rules.config';
 import { flat, loc, source, state, vendor } from './fixtures';
@@ -174,5 +175,45 @@ describe('golden: deficit before D2 (lost sales must not hide demand D1..D2)', (
     const qty = generateProposals(s)[0].qty;
     // Arrives day 3 on an empty camp; days 3, 4, 5 consume 60.
     expect(qty - 3 * 20).toBe(16);
+  });
+});
+
+describe('order schedule override moves review period, SS/MOP and D2', () => {
+  // σ = √(100/3) from history 10,10,10,20; minimum fill 0 so MOP = SS = ceil(1.6449 × 5.774 × √(LT + RP)).
+  const s = (vendorOrderDays = {}) =>
+    state({ vendorOrderDays, locations: [loc('grain', { history: [10, 10, 10, 20], minimumFill: 0 })] });
+  const pp = (o = {}) => planningParams(s(o), 'grain', 'camp')!;
+
+  it('default Mon/Thu on Monday: review period 3, SS 24, D2 6', () => {
+    expect(pp()).toMatchObject({ orderDay: 0, d1: 3, d2: 6, safetyStock: 24, mustOrderPoint: 24 });
+  });
+
+  it('daily: review period 1 → SS ceil(9.497 × 2) = 19, D2 = 1 + 3 = 4', () => {
+    expect(pp({ v: { kind: 'daily' } })).toMatchObject({ orderDay: 0, d1: 3, d2: 4, safetyStock: 19, mustOrderPoint: 19 });
+    expect(itemLocationStats(s({ v: { kind: 'daily' } }))[0].reviewPeriodDays).toBe(1);
+  });
+
+  it('weekly Monday: review period 7 → SS ceil(9.497 × √10) = 31, D2 = 7 + 3 = 10', () => {
+    expect(pp({ v: { kind: 'weekly', weekday: 0 } })).toMatchObject({ orderDay: 0, d1: 3, d2: 10, safetyStock: 31 });
+    expect(itemLocationStats(s({ v: { kind: 'weekly', weekday: 0 } }))[0].reviewPeriodDays).toBe(7);
+  });
+
+  it('daily override proposes on a former non-order day (Tuesday)', () => {
+    const tue = (vendorOrderDays = {}) => state({ today: 1, vendorOrderDays, locations: [loc('grain', { onHand: 70 })] });
+    expect(generateProposals(tue())).toEqual([]);
+    // Tue order: D1 = 4, D2 = Wed + 3 = 5; proj end of day 4 = 70 − 4 × 10 = 30 < MOP 40 → must 10.
+    expect(generateProposals(tue({ v: { kind: 'daily' } }))[0]).toMatchObject({ d1: 4, d2: 5, projectedAtD2: 30, reason: 'must', qty: 10 });
+  });
+
+  it('chooseSource: the override decides who orders today; priority breaks ties', () => {
+    const two = (vendorOrderDays = {}) =>
+      state({
+        today: 1,
+        vendorOrderDays,
+        vendors: { v: vendor('v'), w: vendor('w', { orderDays: [1], leadTimeDays: 2 }) },
+        sourcing: [source('grain', 'v'), source('grain', 'w', { priority: 2 })],
+      });
+    expect(planningParams(two(), 'grain', 'camp')?.vendorId).toBe('w'); // only w orders Tuesday
+    expect(planningParams(two({ v: { kind: 'weekly', weekday: 1 } }), 'grain', 'camp')?.vendorId).toBe('v'); // both Tue → priority
   });
 });

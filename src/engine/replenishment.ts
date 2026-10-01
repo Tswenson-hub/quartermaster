@@ -1,5 +1,5 @@
 // MOP, COP, order-up-to, pack rounding and order proposals (docs/RELEX_RULES.md §3–5, §7).
-import { deliveryDates, nextOrderDayFrom, reviewPeriodDays } from './calendar';
+import { deliveryDates, effectiveVendor, nextOrderDayFrom, reviewPeriodDays } from './calendar';
 import { findLocation, forecastErrorStdDev, forecastLocation } from './forecast';
 import { projectStock, receiptsByDay } from './projection';
 import { rules as defaultRules, type Rules } from './rules.config';
@@ -37,8 +37,9 @@ export function chooseSource(
 ): { rule: SourcingRule; vendor: Vendor; orderDay: Day } | undefined {
   let best: { rule: SourcingRule; vendor: Vendor; orderDay: Day } | undefined;
   for (const rule of state.sourcing) {
-    const vendor = state.vendors[rule.vendorId];
-    if (rule.itemId !== itemId || !vendor || vendor.orderDays.length === 0) continue;
+    if (rule.itemId !== itemId) continue;
+    const vendor = effectiveVendor(state, rule.vendorId);
+    if (!vendor) continue;
     const orderDay = nextOrderDayFrom(vendor, state.today);
     if (
       !best ||

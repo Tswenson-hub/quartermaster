@@ -1,5 +1,7 @@
 // Public engine API (see EngineApi in types.ts). The store imports from here only.
+import { effectiveOrderDays } from './calendar';
 import { forecast } from './forecast';
+import { itemLocationStats, vendorStats } from './masterData';
 import { project } from './projection';
 import { planningParams } from './replenishment';
 import { initGame, placeOrders, refresh, tick } from './tick';
@@ -13,11 +15,9 @@ export const engine = {
   project: (state, itemId, depotId, from, to) => project(state, itemId, depotId, from, to),
   placeOrders: (state, decisions) => placeOrders(state, decisions),
   tick: (state) => tick(state),
-  // TODO(engine): stubs added by lead with the master-data contract. Replace with calendar.effectiveOrderDays
-  // and masterData.itemLocationStats / vendorStats.
-  effectiveOrderDays: (state, vendorId) => state.vendors[vendorId]?.orderDays ?? [],
-  itemLocationStats: () => [],
-  vendorStats: () => [],
+  effectiveOrderDays: (state, vendorId) => effectiveOrderDays(state, vendorId),
+  itemLocationStats: (state) => itemLocationStats(state),
+  vendorStats: (state) => vendorStats(state),
 } satisfies EngineApi;
 
 export { initGame, refresh, forecast, planningParams, project, placeOrders, tick };

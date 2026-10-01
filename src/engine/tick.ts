@@ -1,5 +1,5 @@
 // Game loop: initGame, refresh (planning for today), placeOrders, tick (advance one day).
-import { nextOrderDayFrom } from './calendar';
+import { effectiveVendor, nextOrderDayFrom } from './calendar';
 import { baselineFromHistory, forecastLocation } from './forecast';
 import { projectLocation } from './projection';
 import { generatePlanLines, roundToPack } from './replenishment';
@@ -12,6 +12,7 @@ import { rules as defaultRules, type Rules } from './rules.config';
 import type {
   GameSetup,
   Day,
+  DeliveryRecord,
   ExceptionKind,
   FiscalPeriod,
   GameState,
@@ -30,6 +31,13 @@ const EVENT_KINDS: ReadonlySet<ExceptionKind> = new Set([
   'forecast-deviation',
   'delivery-late',
 ]);
+
+/** Due date when placed: OpenOrder.promisedOn, else orderedOn + vendor lead time (legacy/fixtures). */
+export function promisedOn(o: OpenOrder, state: GameState): Day {
+  if (o.promisedOn !== undefined) return o.promisedOn;
+  const vendor = state.vendors[o.vendorId];
+  return vendor ? o.orderedOn + vendor.leadTimeDays : o.deliveryOn;
+}
 
 export function periodFor(periods: readonly FiscalPeriod[], day: Day): FiscalPeriod | undefined {
   return periods.find((p) => p.start <= day && day <= p.end);
@@ -61,7 +69,8 @@ export function initGame(scenario: Scenario, setup?: GameSetup, r: Rules = defau
     today: 0,
     lengthDays: scenario.lengthDays,
     periods,
-    openOrders: openOrders ?? [],
+    // An opening order's promised date is the date the scenario gives it.
+    openOrders: (openOrders ?? []).map((o) => ({ ...o, promisedOn: o.promisedOn ?? o.deliveryOn })),
     proposals: [],
     exceptions: [],
     kpis: [],
@@ -76,7 +85,6 @@ export function initGame(scenario: Scenario, setup?: GameSetup, r: Rules = defau
       values: Array<number>(scenario.lengthDays).fill(1),
     },
     vendorTriggers: {},
-    // TODO(engine): placeholder defaults added by lead with the master-data contract.
     vendorOrderDays: {},
     deliveries: [],
     vendorPlans: [],
@@ -92,8 +100,9 @@ export function initGame(scenario: Scenario, setup?: GameSetup, r: Rules = defau
 function earliestDelivery(state: GameState, loc: ItemLocation): Day | undefined {
   let best: Day | undefined;
   for (const s of state.sourcing) {
-    const v = state.vendors[s.vendorId];
-    if (s.itemId !== loc.itemId || !v || v.orderDays.length === 0) continue;
+    if (s.itemId !== loc.itemId) continue;
+    const v = effectiveVendor(state, s.vendorId);
+    if (!v) continue;
     const d = nextOrderDayFrom(v, state.today) + v.leadTimeDays;
     if (best === undefined || d < best) best = d;
   }
@@ -179,6 +188,7 @@ export function placeOrders(state: GameState, decisions: ProposalDecisionInput[]
       qty,
       orderedOn: state.today,
       deliveryOn: state.today + vendor.leadTimeDays,
+      promisedOn: state.today + vendor.leadTimeDays,
       cost: qty * source.unitCost,
     });
   }
@@ -220,7 +230,8 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
     const fail = deliveryRng.next();
     const lateBy = lateDaysMin + Math.floor(deliveryRng.next() * (lateDaysMax - lateDaysMin + 1));
     const vendor = state.vendors[o.vendorId];
-    if (!vendor || o.deliveryOn !== o.orderedOn + vendor.leadTimeDays || fail < vendor.reliability || lateBy <= 0) {
+    // Already pushed back past its promised date → it arrives now (one delay per order).
+    if (!vendor || o.deliveryOn !== promisedOn(o, state) || fail < vendor.reliability || lateBy <= 0) {
       return o;
     }
     events.push({
@@ -233,6 +244,21 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
     });
     return { ...o, deliveryOn: t + lateBy };
   });
+  const deliveries: DeliveryRecord[] = [...(state.deliveries ?? [])];
+  for (const o of orders) {
+    if (o.deliveryOn > t) continue;
+    deliveries.push({
+      orderId: o.id,
+      itemId: o.itemId,
+      depotId: o.depotId,
+      vendorId: o.vendorId,
+      qty: o.qty,
+      cost: o.cost,
+      orderedOn: o.orderedOn,
+      promisedOn: promisedOn(o, state),
+      receivedOn: t,
+    });
+  }
   const openOrders = orders.filter((o) => o.deliveryOn > t);
 
   const locations = state.locations.map((loc) => {
@@ -348,6 +374,7 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
     today: t + 1,
     locations,
     openOrders,
+    deliveries,
     periods,
     morale,
     kpis,
