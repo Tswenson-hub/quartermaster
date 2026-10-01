@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { deliveryDates, isOrderDay, nextOrderDayAfter, nextOrderDayFrom, reviewPeriodDays, weekdayOf } from '../../src/engine/calendar';
-import { vendor } from './fixtures';
+import {
+  deliveryDates,
+  effectiveOrderDays,
+  effectiveVendor,
+  isOrderDay,
+  nextOrderDayAfter,
+  nextOrderDayFrom,
+  reviewPeriodDays,
+  weekdayOf,
+} from '../../src/engine/calendar';
+import type { GameState, Weekday } from '../../src/engine/types';
+import { state, vendor } from './fixtures';
 
 const monThu = vendor('v'); // Mon/Thu, LT 3
 
@@ -34,5 +44,37 @@ describe('calendar', () => {
 
   it('throws for a vendor with no order days', () => {
     expect(() => nextOrderDayAfter(vendor('x', { orderDays: [] }), 0)).toThrow();
+  });
+});
+
+describe('effective order days (player schedule override)', () => {
+  const s = (vendorOrderDays: GameState['vendorOrderDays'] = {}) => state({ vendorOrderDays });
+
+  it('default: the vendor’s own days', () => {
+    expect(effectiveOrderDays(s(), 'v')).toEqual([0, 3]);
+    expect(effectiveVendor(s(), 'v')?.orderDays).toEqual([0, 3]);
+  });
+
+  it('daily → every weekday', () => {
+    expect(effectiveOrderDays(s({ v: { kind: 'daily' } }), 'v')).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(effectiveVendor(s({ v: { kind: 'daily' } }), 'v')).toMatchObject({ id: 'v', leadTimeDays: 3, orderDays: [0, 1, 2, 3, 4, 5, 6] });
+  });
+
+  it('weekly → that weekday', () => {
+    expect(effectiveOrderDays(s({ v: { kind: 'weekly', weekday: 4 } }), 'v')).toEqual([4]);
+  });
+
+  it('invalid weekly weekday falls back to the vendor’s days', () => {
+    for (const weekday of [7, -1, 2.5, NaN]) {
+      expect(effectiveOrderDays(s({ v: { kind: 'weekly', weekday: weekday as Weekday } }), 'v')).toEqual([0, 3]);
+    }
+  });
+
+  it('unknown vendor or no days at all → undefined (the guard for nextOrderDayAfter)', () => {
+    expect(effectiveOrderDays(s(), 'nobody')).toEqual([]);
+    expect(effectiveVendor(s(), 'nobody')).toBeUndefined();
+    expect(effectiveVendor(state({ vendors: { v: vendor('v', { orderDays: [] }) } }), 'v')).toBeUndefined();
+    // A daily override rescues a vendor with no days of its own.
+    expect(effectiveVendor(state({ vendors: { v: vendor('v', { orderDays: [] }) }, vendorOrderDays: { v: { kind: 'daily' } } }), 'v')).toBeDefined();
   });
 });
