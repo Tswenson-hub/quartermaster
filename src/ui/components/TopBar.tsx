@@ -62,7 +62,7 @@ export function TopBar() {
           </dd>
         </div>
         <div className="stat">
-          <dt>Treasury left</dt>
+          <dt>Treasury</dt>
           <dd className={remaining < 0 ? 'bad-text' : undefined}>{fmtSilver(remaining)}</dd>
         </div>
         <div className="stat">
@@ -81,7 +81,11 @@ export function TopBar() {
             <dd className="market-chip" data-testid="market">
               <span className="market-ticker">{market.ticker}</span>
               <span className={`market-src ${market.source}`}>{market.source}</span>
-              {market.synthetic && <span className="market-src synthetic">synthetic placeholder</span>}
+              {market.synthetic && (
+                <span className="market-src synthetic" title="Generated placeholder prices, not real market data">
+                  synthetic
+                </span>
+              )}
             </dd>
           </div>
         )}

@@ -34,9 +34,7 @@ export function TitleScreen() {
               data-testid={`difficulty-${o.id}`}
               onClick={() => setDifficulty(o.id)}
             >
-              <span className="difficulty-label">
-                {o.title} <span className="muted">· {o.label}</span>
-              </span>
+              <span className="difficulty-label">{o.title}</span>
               <span className="difficulty-flavour">{o.description}</span>
               <span className="difficulty-meta">
                 <Term k="market">Market</Term> {o.ticker} · budget ×{o.budgetFactor}
