@@ -14,7 +14,10 @@ export interface SafetyStockInput {
 }
 
 export interface Rules {
-  /** Statistical safety stock (§3). MOP = max(safety stock, ItemLocation.minimumFill). */
+  /**
+   * Statistical safety stock (§3). MOP = max(safety stock, ItemLocation.minimumFill).
+   * Covers forecast error only — owner decision 2026-10-01: no lead-time / delivery-delay term.
+   */
   safetyStock: (i: SafetyStockInput) => number;
   /** Can Order Point as a multiple over MOP, or extra days of cover. */
   canOrderPoint: { extraDaysOfCover: number };

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { scenarios } from '../../src/content';
+import { rules } from '../../src/engine/rules.config';
 
 vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
 const { useGameStore, selectServiceLevel } = await import('../../src/store');
@@ -19,11 +20,17 @@ describe('playthrough: accept every proposal', () => {
     });
   }
 
-  // Accepting every system proposal should never starve the front.
+  // Accepting every system proposal should never starve the front. Exception: an order-trigger lesson
+  // (teaches 'order trigger') deliberately sets triggers the player must lower, so there the player
+  // first lowers every vendor's trigger to the rules default.
   for (const scenario of scenarios) {
-    it(`${scenario.id} keeps service level ≥ 95% when all proposals are accepted`, () => {
+    const triggerLesson = scenario.teaches.includes('order trigger');
+    it(`${scenario.id} keeps service level ≥ 95% when all proposals are accepted${triggerLesson ? ' (triggers lowered)' : ''}`, () => {
       const s = useGameStore.getState();
       s.loadScenario(scenario);
+      if (triggerLesson) {
+        for (const id of Object.keys(scenario.initial.vendors)) s.setVendorTrigger(id, rules.vendorMinimum.defaultTrigger);
+      }
       for (let d = 0; d < scenario.lengthDays; d++) {
         useGameStore.getState().game!.proposals.forEach((_, i) => s.decideProposal(i, 'accepted'));
         s.endDay();
