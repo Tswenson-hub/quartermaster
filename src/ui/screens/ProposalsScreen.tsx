@@ -100,7 +100,13 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
         <div className={`vendor-min ${met ? 'met' : 'short'}`}>
           <div className="vendor-min-label">
             Your order vs the <Term k="vendorMin">minimum</Term> of {fmt(min.amount)} —{' '}
-            {met ? <strong>met ✓</strong> : <strong>short by {fmt(min.amount - accepted)}</strong>}
+            {met ? (
+              <strong>met ✓</strong>
+            ) : accepted === 0 && open >= min.amount ? (
+              <span className="muted">met once you accept these lines</span>
+            ) : (
+              <strong>short by {fmt(min.amount - accepted)}</strong>
+            )}
           </div>
           {group.droppedCount > 0 && (
             <p className="vendor-min-warn bad">
@@ -332,7 +338,7 @@ function OrderTrigger({ vendor, plan, customTrigger }: { vendor: Vendor; plan?: 
         ]}
         caption={
           <>
-            <span className="legend-chip seg-accepted" /> real need {fmt(need)}
+            <span className={`legend-chip ${status === 'below-trigger' ? 'seg-short' : 'seg-accepted'}`} /> real need {fmt(need)}
             <span className="legend-chip marker marker-trigger" /> trigger {pct(trigger)}
             <span className="legend-chip marker" /> minimum
           </>
