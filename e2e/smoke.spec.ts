@@ -16,6 +16,8 @@ test('app loads', async ({ page }) => {
 
 test('tutorial 1: accept proposals for 7 days with no stockout', async ({ page }) => {
   await page.getByTestId('start-scenario-tutorial-1').click();
+  // The game opens on Dispatch; proposals live on their own screen.
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('button', { name: /Order Proposals/ }).click();
   for (let day = 0; day < 7; day++) {
     await expect(page.getByTestId('today')).toContainText(String(day));
     const accepts = page.getByTestId('proposal-accept');
