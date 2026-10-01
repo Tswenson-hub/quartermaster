@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { bias, daysOfSupply, kpiSummary, serviceLevel, swape } from '../../src/engine/kpi';
 import type { DailyKpi } from '../../src/engine/types';
-import { loc, state } from './fixtures';
+import { tick } from '../../src/engine/tick';
+import { flat, item, loc, quietRules as q, source, state } from './fixtures';
 
 const row = (day: number, demand: number, fulfilled: number, forecast: number, spoiled = 0, absError = Math.abs(demand - forecast)): DailyKpi => ({
   day,
@@ -56,5 +57,33 @@ describe('KPI functions', () => {
     // Two items: +5 and −5 against forecast → row forecast = demand, but absError 10.
     const s = state({ kpis: [row(0, 20, 20, 20, 0, 10)] });
     expect(kpiSummary(s)).toMatchObject({ swape: 0.5, bias: 0 });
+  });
+});
+
+describe('days of supply = Σ on hand ÷ Σ mean daily forecast (not a mean of ratios)', () => {
+  // grain: 100 on hand, 10/day. salt: 5 on hand, 0.01/day → 500 days on its own.
+  const two = () =>
+    state({
+      items: { grain: item('grain'), salt: item('salt') },
+      sourcing: [source('grain'), source('salt')],
+      locations: [loc('grain'), loc('salt', { onHand: 5, history: flat(0.01) })],
+    });
+
+  it('kpiSummary: 105 / 10.01, not (10 + 500) / 2', () => {
+    expect(daysOfSupply(two(), two().locations[1])).toBeCloseTo(500, 9);
+    expect(kpiSummary(two()).daysOfSupply).toBeCloseTo(105 / 10.01, 9);
+  });
+
+  it('DailyKpi row: Σ end-of-day stock ÷ Σ mean forecast from tomorrow', () => {
+    // Day 0 (noise off): grain sells 10 → 90; salt demand rounds to 0 → 5.
+    const s = tick(two(), q);
+    expect(s.kpis[0].daysOfSupply).toBeCloseTo(95 / 10.01, 9);
+  });
+
+  it('no forecast anywhere: summary Infinity with stock (0 without); the stored row records 0', () => {
+    const none = state({ locations: [loc('grain', { history: flat(0) })] });
+    expect(kpiSummary(none).daysOfSupply).toBe(Infinity);
+    expect(kpiSummary(state({ locations: [loc('grain', { onHand: 0, history: flat(0) })] })).daysOfSupply).toBe(0);
+    expect(tick(none, q).kpis[0].daysOfSupply).toBe(0);
   });
 });

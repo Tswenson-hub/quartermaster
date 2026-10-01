@@ -4,6 +4,7 @@ import { baselineFromHistory, forecastLocation } from './forecast';
 import { projectLocation } from './projection';
 import { generatePlanLines, roundToPack } from './replenishment';
 import { actualDemand } from './demand';
+import { coverDays, meanDailyForecast } from './kpi';
 import { updateCareer } from './rank';
 import { addLot, consume, expire, lotsOf } from './lots';
 import { createRng, hashSeed, rngForDay } from './rng';
@@ -201,6 +202,9 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
   const events: PlanningException[] = [];
   let morale = state.morale;
   const kpi = { day: t, demand: 0, fulfilled: 0, spoiled: 0, holdingCost: 0, spend: 0, forecast: 0, absError: 0, daysOfSupply: 0 };
+  // Days of supply (§10): Σ end-of-day stock ÷ Σ mean daily forecast from tomorrow (as of this morning).
+  let stockSum = 0;
+  let forecastSum = 0;
 
   for (const o of state.openOrders) if (o.orderedOn === t) kpi.spend += o.cost;
 
@@ -290,9 +294,8 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
 
     kpi.forecast += forecastToday;
     kpi.absError += Math.abs(demand - forecastToday);
-    // Days of supply: end-of-day stock ÷ tomorrow's forecast (as of this morning); none → 0.
-    const forecastTomorrow = forecastLocation(state, loc, t + 1, t + 1, r)[0].total;
-    if (forecastTomorrow > 0) kpi.daysOfSupply += stock / forecastTomorrow;
+    stockSum += stock;
+    forecastSum += meanDailyForecast(state, loc, t + 1, r);
     kpi.demand += demand;
     kpi.fulfilled += fulfilled;
     kpi.spoiled += spoiled;
@@ -331,6 +334,8 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
   }
 
   morale = clamp(morale + r.morale.dailyRecovery, 0, 100);
+  // Stored rows are saved as JSON, so no Infinity: stock with no forecast at all records 0.
+  kpi.daysOfSupply = coverDays(stockSum, forecastSum, 0);
 
   const kpis = [...state.kpis, kpi];
   const career = updateCareer(state, t, kpis, locations, period && period.end === t ? period : undefined, r);

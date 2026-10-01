@@ -30,12 +30,32 @@ export function bias(actual: readonly number[], forecast: readonly number[]): nu
   return (f - a) / a;
 }
 
-/** On hand ÷ mean daily forecast over the next horizon days. No forecast → Infinity (0 if no stock). */
-export function daysOfSupply(state: GameState, loc: ItemLocation, r: Rules = defaultRules): number {
+/** Mean daily forecast over `rules.kpi.daysOfSupplyHorizon` days starting at `from`. */
+export function meanDailyForecast(state: GameState, loc: ItemLocation, from: number, r: Rules = defaultRules): number {
   const h = Math.max(1, r.kpi.daysOfSupplyHorizon);
-  const avg = sum(forecastLocation(state, loc, state.today, state.today + h - 1, r).map((p) => p.total)) / h;
-  if (avg <= 0) return loc.onHand > 0 ? Infinity : 0;
-  return loc.onHand / avg;
+  return sum(forecastLocation(state, loc, from, from + h - 1, r).map((p) => p.total)) / h;
+}
+
+/** Stock ÷ mean daily forecast. No forecast → `noForecast` if there is stock, else 0. */
+export function coverDays(onHand: number, meanForecast: number, noForecast = Infinity): number {
+  if (meanForecast <= 0) return onHand > 0 ? noForecast : 0;
+  return onHand / meanForecast;
+}
+
+/** One item-location: on hand ÷ its mean daily forecast from today. No forecast → Infinity (0 if no stock). */
+export function daysOfSupply(state: GameState, loc: ItemLocation, r: Rules = defaultRules): number {
+  return coverDays(loc.onHand, meanDailyForecast(state, loc, state.today, r));
+}
+
+/**
+ * Days of supply over all locations (§10): Σ on hand ÷ Σ mean daily forecast — not a mean of
+ * per-location ratios, so one near-zero forecast can't dominate.
+ */
+export function totalDaysOfSupply(state: GameState, r: Rules = defaultRules): number {
+  return coverDays(
+    sum(state.locations.map((l) => l.onHand)),
+    sum(state.locations.map((l) => meanDailyForecast(state, l, state.today, r))),
+  );
 }
 
 function ratio(num: number, den: number): number {
@@ -45,7 +65,7 @@ function ratio(num: number, den: number): number {
 
 export interface KpiSummary {
   serviceLevel: number;
-  /** Mean days of supply over item-locations with a forecast. */
+  /** Σ on hand ÷ Σ mean daily forecast, all locations, as of today (Infinity: stock but no forecast). */
   daysOfSupply: number;
   spoiled: number;
   holdingCost: number;
@@ -58,10 +78,9 @@ export interface KpiSummary {
 /** Campaign-to-date KPIs; `lastDays` limits the KPI rows used (e.g. 28 for the current period). */
 export function kpiSummary(state: GameState, lastDays?: number, r: Rules = defaultRules): KpiSummary {
   const rows = lastDays === undefined ? state.kpis : state.kpis.slice(-lastDays);
-  const dos = state.locations.map((l) => daysOfSupply(state, l, r)).filter((d) => Number.isFinite(d));
   return {
     serviceLevel: serviceLevel(rows),
-    daysOfSupply: dos.length === 0 ? 0 : sum(dos) / dos.length,
+    daysOfSupply: totalDaysOfSupply(state, r),
     spoiled: sum(rows.map((k) => k.spoiled)),
     holdingCost: sum(rows.map((k) => k.holdingCost)),
     swape: ratio(sum(rows.map((k) => k.absError)), sum(rows.map((k) => k.demand))),

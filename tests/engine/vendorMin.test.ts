@@ -1,6 +1,9 @@
 // CO-MRP: order trigger + build to vendor minimum, one pack at a time (RELEX_RULES §4, §6).
 import { describe, expect, it } from 'vitest';
+import { scenarios } from '../../src/content';
+import { engine } from '../../src/engine';
 import { generatePlanLines } from '../../src/engine/replenishment';
+import { snapshotSeries, toMarketSignal } from '../../src/store/market';
 import { rules, type Rules } from '../../src/engine/rules.config';
 import type { Vendor } from '../../src/engine/types';
 import { refresh } from '../../src/engine/tick';
@@ -173,5 +176,31 @@ describe('order trigger lookup and vendorPlans', () => {
     const out = refresh(two);
     expect(out.vendorPlans).toEqual([expect.objectContaining({ need: 60, status: 'built' })]);
     expect(out.proposals.reduce((a, p) => a + p.qty, 0)).toBe(100);
+  });
+});
+
+describe('VendorPlan.ratio is exactly need ÷ minimum', () => {
+  it('golden: need 30 of 100 → 0.3; value minimum need 60 silver of 160 → 0.375', () => {
+    const units = refresh({ ...setup({ kind: 'units', amount: 100 }).s, vendorTriggers: { v: 0.3 } }).vendorPlans[0];
+    expect(units).toMatchObject({ need: 30, minimum: 100, ratio: 0.3 });
+    const value = refresh({ ...setup({ kind: 'value', amount: 160 }).s, vendorTriggers: { v: 0.3 } }).vendorPlans[0];
+    expect(value).toMatchObject({ need: 60, minimum: 160, ratio: 60 / 160 });
+  });
+
+  it('every plan, every day, every scenario and difficulty (accept-all)', () => {
+    for (const sc of scenarios) {
+      for (const difficulty of ['easy', 'normal', 'hard'] as const) {
+        const market = toMarketSignal(snapshotSeries(rules.difficulty[difficulty].ticker), sc.lengthDays);
+        let s = engine.initGame(sc, { difficulty, market });
+        for (let d = 0; d <= sc.lengthDays; d++) {
+          for (const p of s.vendorPlans) {
+            if (p.minimum === undefined) expect(p.ratio).toBe(1);
+            else expect(p.ratio, `${sc.id} ${difficulty} day ${s.today} ${p.vendorId}`).toBe(p.need / p.minimum);
+          }
+          if (s.status !== 'playing') break;
+          s = engine.tick(engine.placeOrders(s, s.proposals.map((_, index) => ({ index, decision: 'accepted' as const }))));
+        }
+      }
+    }
   });
 });

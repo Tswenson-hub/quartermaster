@@ -31,7 +31,9 @@ export type BuildOutcome =
 
 export interface BuildResult {
   outcome: BuildOutcome;
-  /** Must-order need ÷ minimum (0–∞). */
+  /** Real need: must lines' pack-rounded total, in the minimum's units or value. */
+  need: number;
+  /** Exactly need ÷ minimum.amount (0–∞). */
   needRatio: number;
   lines: BuildCandidate[];
   /** Item that received each added pack, in order (for explaining the build). */
@@ -63,9 +65,9 @@ export function buildToMinimum(
   const steps: string[] = [];
   const need = minimumTotal(lines.filter((l) => l.must), min);
   const needRatio = min.amount > 0 ? need / min.amount : Infinity;
-  if (need <= 0) return { outcome: 'no-need', needRatio: 0, lines, steps };
-  if (need >= min.amount) return { outcome: 'met', needRatio, lines, steps };
-  if (needRatio < trigger) return { outcome: 'below-trigger', needRatio, lines, steps };
+  if (need <= 0) return { outcome: 'no-need', need, needRatio, lines, steps };
+  if (need >= min.amount) return { outcome: 'met', need, needRatio, lines, steps };
+  if (needRatio < trigger) return { outcome: 'below-trigger', need, needRatio, lines, steps };
 
   const key = (l: BuildCandidate): [number, number] =>
     r.vendorMinimum.buildPriority === 'criticality' ? [-l.criticality, daysOfCover(l)] : [daysOfCover(l), -l.criticality];
@@ -87,7 +89,7 @@ export function buildToMinimum(
     steps.push(pick.itemId);
     total = minimumTotal(lines, min);
   }
-  return { outcome: total >= min.amount ? 'built' : 'built-short', needRatio, lines, steps };
+  return { outcome: total >= min.amount ? 'built' : 'built-short', need, needRatio, lines, steps };
 }
 
 /** Effective order trigger: player override ?? vendor default ?? rules default. */
@@ -146,8 +148,15 @@ export function applyVendorMinimums(
       trigger,
       r,
     );
-    const need = minimumTotal(group.filter((l) => l.proposal.reason === 'must').map((l) => ({ qty: l.proposal.qty, unitCost: l.unitCost })), min);
-    vendorPlans.push({ vendorId, need, minimum: min.amount, trigger, ratio: result.needRatio, status: STATUS[result.outcome] });
+    // One definition: need and ratio both come from the build's pack-rounded must need.
+    vendorPlans.push({
+      vendorId,
+      need: result.need,
+      minimum: min.amount,
+      trigger,
+      ratio: result.needRatio,
+      status: STATUS[result.outcome],
+    });
 
     if (result.outcome === 'below-trigger' || result.outcome === 'no-need') {
       if (result.outcome === 'below-trigger') {
