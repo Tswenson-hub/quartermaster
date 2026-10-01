@@ -2,7 +2,7 @@ import type { Scenario } from '../engine/types';
 import { SANDBOX_SCENARIO, TUTORIAL_SCENARIOS } from './scenarios';
 
 export { ITEMS, ITEM_IDS } from './items';
-export { VENDORS } from './vendors';
+export { VENDORS, DC_LANES } from './vendors';
 export { SOURCING } from './sourcing';
 export { DEPOTS } from './depots';
 export { BATTLE_PLANS, BATTLE_PLANS_BY_ID, BATTLES, type Battle } from './battlePlans';
