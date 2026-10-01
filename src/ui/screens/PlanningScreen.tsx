@@ -108,8 +108,8 @@ function ItemDetail({ game, loc }: { game: GameState; loc: ItemLocation }) {
               <dt><Term k="safetyStock" /></dt>
               <dd>{fmtQty(params.safetyStock)}</dd>
               <dt><Term k="minimumFill" /></dt>
-              <dd>{fmtQty(loc.minimumFill)}</dd>
-              <dt><Term k="mop">MOP</Term> <span className="muted">must order point</span></dt>
+              <dd>{fmtQty(params.minimumFill)}</dd>
+              <dt><Term k="mop">MOP</Term> <span className="muted">larger of the two</span></dt>
               <dd>{fmtQty(params.mustOrderPoint)}</dd>
               <dt><Term k="cop">COP</Term> <span className="muted">can order point</span></dt>
               <dd>{fmtQty(params.canOrderPoint)}</dd>
