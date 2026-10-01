@@ -16,6 +16,5 @@ export const engine = {
 } satisfies EngineApi;
 
 export { initGame, refresh, forecast, planningParams, project, placeOrders, tick };
-export { generateProposals, roundToPack } from './replenishment';
 export * from './calendar';
 export { rules } from './rules.config';

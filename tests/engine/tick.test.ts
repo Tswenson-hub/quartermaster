@@ -19,8 +19,8 @@ describe('placeOrders', () => {
       expect.objectContaining({ itemId: 'grain', vendorId: 'v', qty: 30, orderedOn: 0, deliveryOn: 3, cost: 60 }),
     ]);
     expect(s.periods[0].committed).toBe(60);
-    // Now covered by the open order: proj at D2 = 40 → can, no below-MOP exception.
-    expect(s.proposals[0]).toMatchObject({ reason: 'can', projectedAtD2: 40 });
+    // Now covered by the open order: proj at D2 = 40 → can-order only, which is not proposed.
+    expect(s.proposals).toEqual([]);
     expect(s.exceptions.some((e) => e.kind === 'below-mop')).toBe(false);
   });
 

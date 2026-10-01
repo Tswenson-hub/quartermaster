@@ -8,6 +8,7 @@ import type { Day, DepotId, FiscalPeriod, GameState, ItemId, OrderProposal, Plan
 import {
   isScenarioOver,
   selectCurrentPeriod,
+  selectDecisionPreview,
   selectExceptionsToday,
   selectForecast,
   selectPlanningParams,
@@ -16,6 +17,7 @@ import {
   useGameStore,
 } from '../store';
 import { scenarios } from '../content';
+import { rules } from '../engine/rules.config';
 import { useUiStore } from './uiStore';
 
 /** Playable levels, tutorial first. */
@@ -68,8 +70,15 @@ export interface PlanningView {
   points: PlanningPoint[];
   /** MOP/COP/D1/D2 at the next order opportunity; undefined if the item has no source. */
   params?: PlanningParams;
+  /** Day whose end-of-day projection is compared to the MOP (per rules.projection.measureAtD2). */
+  d2CheckDay?: Day;
   /** Today's proposal for this item-location, if any (carries D1/D2). */
   proposal?: OrderProposal;
+}
+
+/** 'before-d2-receipt' reads the projection at the end of day D2−1, just before the D2 delivery. */
+export function d2CheckDay(d2: Day): Day {
+  return rules.projection.measureAtD2 === 'before-d2-receipt' ? d2 - 1 : d2;
 }
 
 export function usePlanningView(itemId: ItemId, depotId: DepotId, pastDays = 21, futureDays = 21): PlanningView | null {
@@ -90,13 +99,15 @@ export function usePlanningView(itemId: ItemId, depotId: DepotId, pastDays = 21,
       projected: f.day >= game.today ? proj[f.day - game.today] : undefined,
     }));
     const proposal = game.proposals.find((p) => p.itemId === itemId && p.depotId === depotId);
+    const params = selectPlanningParams(game, itemId, depotId);
     return {
       itemId,
       depotId,
       today: game.today,
       onHand: loc.onHand,
       points,
-      params: selectPlanningParams(game, itemId, depotId),
+      params,
+      d2CheckDay: params ? d2CheckDay(params.d2) : undefined,
       proposal,
     };
   }, [game, itemId, depotId, pastDays, futureDays]);
@@ -115,6 +126,8 @@ export interface ProposalLine {
   packSize: number;
   /** Display cost at `qty` (engine re-prices on accept). */
   cost: number;
+  /** Accepted, but the engine would not ship it (e.g. below vendor minimum, no surcharge). */
+  dropped: boolean;
 }
 
 export interface VendorGroup {
@@ -125,10 +138,17 @@ export interface VendorGroup {
   /** Accepted + undecided lines. */
   openValue: number;
   openUnits: number;
-  /** Accepted lines fall short of the vendor minimum (and something is accepted). */
-  belowMinimum: boolean;
-  /** Surcharge the vendor charges for sending a short order; undefined = short orders not allowed. */
-  surcharge?: number;
+  /** Vendor-minimum surcharge the engine would add if the day ended now. */
+  surcharge: number;
+  /** Accepted lines the engine would drop (won't ship). */
+  droppedCount: number;
+}
+
+/** What ending the day would order — the engine's own placeOrders on today's decisions. */
+export function useDecisionPreview() {
+  const game = useGame();
+  const decisions = useGameStore((s) => s.decisions);
+  return useMemo(() => (game ? selectDecisionPreview(game, decisions) : null), [game, decisions]);
 }
 
 function sourcingFor(sourcing: SourcingRule[], p: OrderProposal) {
@@ -139,11 +159,13 @@ export function useVendorGroups(): VendorGroup[] {
   const game = useGame();
   const decisions = useGameStore((s) => s.decisions);
   const drafts = useUiStore((s) => s.draftQty);
+  const preview = useDecisionPreview();
   return useMemo(() => {
     if (!game) return [];
+    const dropped = new Set(preview?.dropped ?? []);
     const byVendor = new Map<string, VendorGroup>();
     for (const v of Object.values(game.vendors)) {
-      byVendor.set(v.id, { vendor: v, lines: [], acceptedValue: 0, acceptedUnits: 0, openValue: 0, openUnits: 0, belowMinimum: false });
+      byVendor.set(v.id, { vendor: v, lines: [], acceptedValue: 0, acceptedUnits: 0, openValue: 0, openUnits: 0, surcharge: 0, droppedCount: 0 });
     }
     game.proposals.forEach((p, index) => {
       const g = byVendor.get(p.vendorId);
@@ -161,7 +183,9 @@ export function useVendorGroups(): VendorGroup[] {
         unitCost,
         packSize: src?.packSize ?? 1,
         cost: qty * unitCost,
+        dropped: dropped.has(index),
       };
+      if (line.dropped) g.droppedCount++;
       g.lines.push(line);
       if (line.decision === 'accepted') {
         g.acceptedValue += line.cost;
@@ -172,14 +196,12 @@ export function useVendorGroups(): VendorGroup[] {
         g.openUnits += qty;
       }
     });
-    for (const g of byVendor.values()) {
-      const min = g.vendor.minimum;
-      const accepted = min?.kind === 'value' ? g.acceptedValue : g.acceptedUnits;
-      g.belowMinimum = !!min && accepted > 0 && accepted < min.amount;
-      g.surcharge = min?.surcharge;
+    for (const o of preview?.orders ?? []) {
+      const g = byVendor.get(o.vendorId);
+      if (g) g.surcharge += o.surcharge ?? 0;
     }
     return [...byVendor.values()].sort((a, b) => b.lines.length - a.lines.length);
-  }, [game, decisions, drafts]);
+  }, [game, decisions, drafts, preview]);
 }
 
 // ---------------------------------------------------------------- treasury
@@ -187,21 +209,21 @@ export function useVendorGroups(): VendorGroup[] {
 export interface TreasuryView {
   period: FiscalPeriod | undefined;
   periods: FiscalPeriod[];
-  /** Value of lines accepted today (incl. any vendor-minimum surcharges), committed when the day ends. */
+  /** What ending the day now would spend (engine preview, incl. surcharges, excl. dropped lines). */
   pendingToday: number;
   remaining: number;
 }
 
 export function useTreasury(): TreasuryView | null {
   const game = useGame();
-  const groups = useVendorGroups();
+  const preview = useDecisionPreview();
   return useMemo(() => {
     if (!game) return null;
     const period = selectCurrentPeriod(game);
-    const pendingToday = groups.reduce((a, g) => a + g.acceptedValue + (g.belowMinimum ? (g.surcharge ?? 0) : 0), 0);
+    const pendingToday = preview?.spend ?? 0;
     const remaining = period ? period.allowance - period.committed - pendingToday : 0;
     return { period, periods: game.periods, pendingToday, remaining };
-  }, [game, groups]);
+  }, [game, preview]);
 }
 
 // ---------------------------------------------------------------- dispatch / KPIs

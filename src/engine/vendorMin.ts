@@ -71,13 +71,14 @@ export function applyVendorMinimums(
         day: state.today,
         vendorId: vendor.id,
         depotId: group[0].proposal.depotId,
-        message: `${vendor.name}: order totals ${round2(total)}${unit}, below the minimum of ${min.amount}${unit}.`,
+        message: `${vendor.name}: order totals ${whole(total)}${unit}, below the minimum of ${whole(min.amount)}${unit}.`,
       });
     }
   }
   return { lines, exceptions };
 }
 
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
+/** Whole units / coins for message text (the UI shows messages verbatim). */
+function whole(n: number): number {
+  return Math.round(n);
 }

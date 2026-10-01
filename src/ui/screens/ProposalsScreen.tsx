@@ -98,11 +98,15 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
             {min.surcharge !== undefined && <span className="muted"> (or {fmtSilver(min.surcharge)} surcharge)</span>} —{' '}
             {met ? <strong>met ✓</strong> : <strong>short by {fmt(min.amount - accepted)}</strong>}
           </div>
-          {group.belowMinimum && (
+          {group.surcharge > 0 && (
             <p className="vendor-min-warn">
-              {group.surcharge !== undefined
-                ? `Sent as it stands, ${vendor.name} adds a surcharge of ${fmtSilver(group.surcharge)}.`
-                : `${vendor.name} will not ride for so small an order — accept more, or reject these lines.`}
+              Sent as it stands, {vendor.name} adds a surcharge of {fmtSilver(group.surcharge)}.
+            </p>
+          )}
+          {group.droppedCount > 0 && (
+            <p className="vendor-min-warn bad">
+              {vendor.name} will not ride for so small an order: {group.droppedCount} accepted line
+              {group.droppedCount === 1 ? '' : 's'} will not ship. Accept more, or reject them.
             </p>
           )}
           <Meter
@@ -171,7 +175,7 @@ function ProposalRow({ line, game }: { line: ProposalLine; game: GameState }) {
   };
 
   return (
-    <tr data-testid="proposal-row" className={`row-${decision ?? 'open'}`}>
+    <tr data-testid="proposal-row" className={`row-${decision ?? 'open'}${line.dropped ? ' row-dropped' : ''}`}>
       <td className="cell-item">
         <button type="button" className="item-cell link" onClick={() => planItem(p.itemId, p.depotId)} title="Open in Item Planning">
           <ItemIcon item={item} size={26} />
@@ -234,6 +238,7 @@ function ProposalRow({ line, game }: { line: ProposalLine; game: GameState }) {
             Reject
           </button>
         </div>
+        {line.dropped && <div className="dropped-note">will not ship: below minimum</div>}
       </td>
     </tr>
   );
