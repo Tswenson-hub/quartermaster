@@ -1387,6 +1387,36 @@ input.edited {
 }
 
 
+/* ------------------------------------------------------------------ camp scene */
+.camp-scene {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  box-shadow: 0 0 0 3px var(--ink);
+  margin-bottom: 16px;
+}
+.camp-grid {
+  display: grid;
+  flex-shrink: 0;
+}
+.camp-cell {
+  background-size: cover;
+  image-rendering: pixelated;
+  position: relative;
+}
+.camp-cell img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.title-card {
+  padding-top: 18px;
+}
+
 /* ------------------------------------------------------------------ new game */
 .difficulty-list {
   display: grid;

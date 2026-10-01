@@ -1,3 +1,4 @@
+import { CampScene } from '../components/CampScene';
 import { KpiPanel } from '../components/KpiPanel';
 import { Panel } from '../components/Panel';
 import { RankBadge } from '../components/RankBadge';
@@ -28,6 +29,7 @@ export function GameOverScreen({ onReview }: { onReview: () => void }) {
             : 'The campaign is over and the army stands. Your ledger goes to the King.'
         }
       >
+        <CampScene className="game-over-camp" cell={32} />
         <div className="game-over-rank">
           <RankBadge level={Math.max(0, rank.level)} size={48} />
           <div>

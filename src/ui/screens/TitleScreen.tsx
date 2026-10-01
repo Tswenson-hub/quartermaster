@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Difficulty } from '../../engine/types';
+import { CampScene } from '../components/CampScene';
 import { Term } from '../components/Term';
 import { getApiKey, setApiKey, useDifficultyOptions, useGameActions, useScenarioList, useStarting } from '../hooks';
 import { useUiStore } from '../uiStore';
@@ -16,6 +17,7 @@ export function TitleScreen() {
   return (
     <main className="title-screen">
       <div className="title-card panel">
+        <CampScene className="title-camp" />
         <h1 className="title-logo">Quartermaster</h1>
         <p className="title-sub">
           The army marches on its stomach. Keep the stores above the <strong>Must Order Point</strong> on the second
