@@ -16,7 +16,7 @@ export function vendor(id: string, extra: Partial<Vendor> = {}): Vendor {
 }
 
 export function loc(itemId: string, extra: Partial<ItemLocation> = {}): ItemLocation {
-  return { itemId, depotId: 'camp', onHand: 100, serviceLevel: 0.95, presentationStock: 40, history: flat(10), ...extra };
+  return { itemId, depotId: 'camp', onHand: 100, serviceLevel: 0.95, minimumFill: 40, history: flat(10), ...extra };
 }
 
 export function source(itemId: string, vendorId = 'v', extra: Partial<SourcingRule> = {}): SourcingRule {
@@ -44,6 +44,14 @@ export function state(extra: Partial<GameState> = {}): GameState {
     exceptions: [],
     kpis: [],
     morale: 80,
+    difficulty: 'normal',
+    market: { ticker: 'FLAT', source: 'snapshot', synthetic: true, firstDate: '', lastDate: '', values: Array<number>(56).fill(1) },
+    vendorTriggers: {},
+    vendorPlans: [],
+    rank: { level: 2, merit: 0, reprimands: 0, overspentStreak: 0 },
+    letters: [],
+    battles: [],
+    status: 'playing',
     ...extra,
   };
 }

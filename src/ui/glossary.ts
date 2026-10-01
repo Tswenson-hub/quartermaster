@@ -8,7 +8,7 @@ export type TermKey =
   | 'd2'
   | 'proposal'
   | 'safetyStock'
-  | 'presentationStock'
+  | 'minimumFill'
   | 'projected'
   | 'shortfall'
   | 'forecast'
@@ -67,7 +67,7 @@ export const GLOSSARY: Record<TermKey, GlossaryEntry> = {
     plain:
       'Extra stock held to cover demand being higher than forecast or a late delivery. Higher service level and more uncertain demand mean more safety stock.',
   },
-  presentationStock: {
+  minimumFill: {
     term: 'Presentation stock',
     flavour: 'One full cart always in sight of the men.',
     plain: 'A minimum quantity you always want on hand regardless of demand. It is added to safety stock to make the MOP.',

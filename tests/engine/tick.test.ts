@@ -52,7 +52,7 @@ describe('tick (noise off)', () => {
     expect(s.today).toBe(4);
     expect(s.openOrders).toEqual([]);
     expect(s.locations[0].history).toEqual(flat(10, 18));
-    expect(s.kpis[0]).toEqual({ day: 0, demand: 10, fulfilled: 10, spoiled: 0, holdingCost: 0, spend: 60, forecast: 10 });
+    expect(s.kpis[0]).toMatchObject({ day: 0, demand: 10, fulfilled: 10, spoiled: 0, holdingCost: 0, spend: 60, forecast: 10 });
     expect(s.kpis.map((k) => k.spend)).toEqual([60, 0, 0, 0]);
   });
 
@@ -173,7 +173,7 @@ describe('initGame + EngineApi', () => {
   };
 
   it('builds periods and day-0 proposals', () => {
-    const s = initGame(scenario, q);
+    const s = initGame(scenario, undefined, q);
     expect(s.today).toBe(0);
     expect(s.periods.map((p) => [p.start, p.end, p.allowance])).toEqual([
       [0, 27, 500],

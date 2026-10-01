@@ -67,7 +67,7 @@ interface LineSpec {
   /** Opening stock in days of mean demand (capped at half the shelf life for perishables). */
   onHandDays: number;
   serviceLevel?: number;
-  presentationStock?: number;
+  minimumFill?: number;
 }
 
 interface ScenarioSpec {
@@ -155,7 +155,7 @@ function buildScenario(s: ScenarioSpec): Scenario {
       depotId: l.depotId,
       onHand: Math.round(spec.mean * Math.min(l.onHandDays, (items[l.itemId].shelfLifeDays ?? Infinity) / 2)),
       serviceLevel: l.serviceLevel ?? DEFAULT_SERVICE_LEVEL[items[l.itemId].criticality],
-      presentationStock: l.presentationStock ?? 0,
+      minimumFill: l.minimumFill ?? 0,
       history: generateHistory(s.seed, l.itemId, l.depotId, spec, HISTORY_DAYS),
     };
   });
@@ -244,7 +244,7 @@ const tutorial: ScenarioSpec[] = [
     allowanceFactor: 1.1,
     vendorIds: ['abbey-granary'],
     lines: [
-      { itemId: 'grain', depotId: 'harrowmere', demand: { cv: 0.12 }, onHandDays: 7, serviceLevel: 0.98, presentationStock: 20 },
+      { itemId: 'grain', depotId: 'harrowmere', demand: { cv: 0.12 }, onHandDays: 7, serviceLevel: 0.98, minimumFill: 20 },
       { itemId: 'hardtack', depotId: 'harrowmere', demand: { cv: 0.45 }, onHandDays: 7, serviceLevel: 0.9 },
     ],
   },

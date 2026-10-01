@@ -20,7 +20,7 @@ export const fixtureScenario: Scenario = {
     depots: { camp: { id: 'camp', name: 'Camp' } },
     sourcing: [{ itemId: 'grain', vendorId: 'mill', unitCost: 2, packSize: 10, priority: 1 }],
     locations: [
-      { itemId: 'grain', depotId: 'camp', onHand: 30, serviceLevel: 0.95, presentationStock: 5, history: Array(28).fill(10) },
+      { itemId: 'grain', depotId: 'camp', onHand: 30, serviceLevel: 0.95, minimumFill: 5, history: Array(28).fill(10) },
     ],
     overrides: [],
     battlePlans: [],
