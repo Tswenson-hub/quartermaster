@@ -103,47 +103,105 @@ In level V, typical weekly volume is under each vendor's minimum: fletchers abou
 a minimum of 120, and the smithy about 185 silver against 250. This forces a top-up with can-order
 items, which is the lesson of the level.
 
-## Icons needed (Raven Fantasy Icons)
+## Curated assets (in `public/assets/`)
 
-Each item's `icon` key should map in `public/assets/manifest.json` to one curated PNG. The proposed
-shape is `"icons": { "item.grain": "icons/items/grain.png", … }`. Pick one icon per row from the
-Raven Fantasy Icons pack. The pack is organised by theme (food, materials, weapons, armor, potions,
-tools). Use the 32×32 or 64×64 versions for every icon, so they all match.
+`public/assets/manifest.json` maps keys to file paths relative to the site root. Prefix the path
+with `import.meta.env.BASE_URL`. It has three groups: `icons` (32×32, Raven), `tiles` (64×64,
+Kenney) and `ui` (empty for now). `Item.icon` values are keys in `icons`. Vendor icons are
+`vendor.<vendorId>`, rank insignia are `rank.<level>` (0–6), and letter icons are
+`letter.<LetterKind>`. Render the icons with `image-rendering: pixelated` to keep the pixel art sharp.
 
-| Icon key | Look for in Raven pack | Fallback idea |
-|---|---|---|
-| item.grain | Sack of grain / wheat sheaf (food) | Bundle of wheat |
-| item.hardtack | Biscuit / hard bread / cracker (food) | Bread loaf |
-| item.salt-pork | Ham / salted meat / meat on bone (food) | Raw meat slab |
-| item.ale | Wooden tankard of ale, or small cask (food/drink) | Mug of beer |
-| item.oats | Grain sack in a different colour, or a hay bundle (materials) | Seeds pouch |
-| item.arrows | Bundle/quiver of arrows (weapons/ammo) | Single arrow |
-| item.bowstrings | Coiled string / thread spool (materials) | Bow with string |
-| item.bolts | Crossbow bolts, or a crossbow (weapons/ammo) | Short metal-tipped arrow |
-| item.horseshoes | Horseshoe (tools/misc) | Iron ingot |
-| item.pitch | Pot of tar / black liquid jar / oil flask (materials/potions) | Black potion |
-| item.siege-rope | Coiled rope (materials/tools) | Rope ladder |
-| item.bandages | Bandage roll / linen cloth (medical/materials) | Cloth bolt |
-| item.poultices | Herb bowl / mortar and pestle / green salve jar (potions/herbs) | Herb bundle |
-| item.mail-rings | Chainmail piece / iron rings (armor/materials) | Chainmail shirt |
+`fbN` is the Raven file `Separated Files/32x32/fbN.png`, which is also cell N−1, row-major, of
+`Full Spritesheet/32x32.png`. To swap an icon, copy another `fbN.png` over the file with the same name.
 
-Also useful from the same pack, as UI icons:
+| Key | Source |
+|---|---|
+| `item.grain` | raven fb516 |
+| `item.hardtack` | raven fb517 |
+| `item.salt-pork` | raven fb486 |
+| `item.ale` | raven fb503 |
+| `item.oats` | raven fb432 |
+| `item.arrows` | raven fb401 |
+| `item.bowstrings` | raven fb1499 |
+| `item.bolts` | raven fb1481 |
+| `item.horseshoes` | raven fb116 |
+| `item.pitch` | raven fb340 |
+| `item.siege-rope` | raven fb2068 |
+| `item.bandages` | raven fb109 |
+| `item.poultices` | raven fb53 |
+| `item.mail-rings` | raven fb2063 |
+| `vendor.abbey-granary` | raven fb37 |
+| `vendor.guild-fletchers` | raven fb1515 |
+| `vendor.mountain-smithy` | raven fb125 |
+| `vendor.river-merchants` | raven fb398 |
+| `vendor.apothecary` | raven fb121 |
+| `vendor.royal-armory` | raven fb34 |
+| `rank.0` | raven fb663 |
+| `rank.1` | raven fb664 |
+| `rank.2` | raven fb856 |
+| `rank.3` | raven fb855 |
+| `rank.4` | raven fb859 |
+| `rank.5` | raven fb857 |
+| `rank.6` | raven fb854 |
+| `letter.sealed` | raven fb107 |
+| `letter.reprimand` | raven fb896 |
+| `letter.commendation` | raven fb880 |
+| `letter.promotion` | raven fb865 |
+| `letter.demotion` | raven fb884 |
+| `letter.battle-won` | raven fb853 |
+| `letter.battle-lost` | raven fb862 |
+| `letter.game-over` | raven fb862 |
+| `ui.battle` | raven fb721 |
+| `ui.coin` | raven fb132 |
+| `ui.treasury` | raven fb158 |
+| `ui.trigger` | raven fb124 |
+| `ui.delivery` | raven fb25 |
+| `ui.camp` | raven fb40 |
+| `ui.spoiled` | raven fb407 |
+| `ui.morale` | raven fb659 |
+| `ui.banner` | raven fb43 |
+| `tile.grass` | kenney medievalTile_57.png |
+| `tile.grass-2` | kenney medievalTile_58.png |
+| `tile.dirt` | kenney medievalTile_13.png |
+| `tile.sand` | kenney medievalTile_01.png |
+| `tile.snow` | kenney medievalTile_29.png |
+| `tile.water` | kenney medievalTile_27.png |
+| `tile.road-ns` | kenney medievalTile_03.png |
+| `tile.road-cross` | kenney medievalTile_05.png |
+| `tile.forest` | kenney medievalTile_44.png |
+| `tile.pines` | kenney medievalTile_48.png |
+| `tile.trees` | kenney medievalTile_42.png |
+| `tile.stumps` | kenney medievalTile_52.png |
+| `tile.crate-yard` | kenney medievalTile_55.png |
+| `struct.tent` | kenney medievalStructure_10.png |
+| `struct.tent-large` | kenney medievalStructure_16.png |
+| `struct.tent-small` | kenney medievalStructure_23.png |
+| `struct.market` | kenney medievalStructure_07.png |
+| `struct.stall` | kenney medievalStructure_22.png |
+| `struct.church` | kenney medievalStructure_04.png |
+| `struct.castle` | kenney medievalStructure_05.png |
+| `struct.windmill` | kenney medievalStructure_13.png |
+| `struct.house` | kenney medievalStructure_20.png |
+| `env.campfire` | kenney medievalEnvironment_21.png |
+| `env.tree` | kenney medievalEnvironment_04.png |
+| `env.rock` | kenney medievalEnvironment_09.png |
+| `env.log` | kenney medievalEnvironment_06.png |
+| `env.bush` | kenney medievalEnvironment_13.png |
 
-| Key | Use | Look for |
-|---|---|---|
-| ui.coin | Silver / budget | Silver coin stack |
-| ui.letter | Battle-plan letters | Sealed scroll / wax-sealed letter |
-| ui.cart | Deliveries / open orders | Wagon / cart |
-| ui.calendar | D1 / D2 markers | Hourglass or sundial |
-| ui.warning | Exceptions | Red exclamation / broken shield |
-| ui.morale | Morale | Banner / helmet |
-| ui.spoiled | Spoilage | Rotten food / skull |
-| vendor.abbey-granary | Vendor crest | Church / cross |
-| vendor.guild-fletchers | Vendor crest | Bow |
-| vendor.mountain-smithy | Vendor crest | Anvil / hammer |
-| vendor.river-merchants | Vendor crest | Boat / anchor |
-| vendor.apothecary | Vendor crest | Potion bottle |
-| vendor.royal-armory | Vendor crest | Crown / shield |
+Suggested camp backdrop: lay `tile.grass` / `tile.grass-2` as the ground, run a `tile.road-ns`
+supply road through it, and put `tile.forest` / `tile.pines` at the edges. Place the tents
+(`struct.tent*`), `env.campfire` and a `struct.market` quartermaster stall on top. Use `tile.snow`
+for the Northern Pass and `tile.dirt` / `tile.stumps` for the Harrowmere siege lines.
+
+### Licences
+
+Full terms are in `public/assets/LICENSES.md`. In short:
+- **Raven Fantasy Icons (free version):** allowed only while the game is free, with no ads and no
+  microtransactions. Don't redistribute the icons on their own. Credit is welcome but not required.
+  Buy the premium version before any commercial release.
+- **Kenney RTS Medieval:** CC0. Credit is optional.
+- **MedievalFantasyFree:** ToffeeCraft free tier, personal use only, no redistribution. **Not
+  shipped.** For the UI, use CSS panels or buy the ToffeeCraft paid tier.
 
 ## Suggested asset purchases (≤ $25 total)
 
