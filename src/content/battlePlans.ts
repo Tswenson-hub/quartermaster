@@ -28,6 +28,7 @@ export const BATTLE_PLANS: BattlePlan[] = [
     announcedOn: 10,
     start: 21,
     end: 27,
+    winServiceLevel: 0.92,
     depotIds: ['harrowmere'],
     statedUplift: { arrows: 2.5, pitch: 3.0, 'siege-rope': 2.0, bandages: 2.0 },
     actualUplift: { arrows: 2.4, pitch: 2.8, 'siege-rope': 2.1, bandages: 2.2 },
@@ -43,6 +44,7 @@ export const BATTLE_PLANS: BattlePlan[] = [
     announcedOn: 22,
     start: 32,
     end: 34,
+    winServiceLevel: 0.85,
     depotIds: ['eastern-camp'],
     statedUplift: { ale: 3.0, grain: 1.5 },
     // Half the shires stayed home. Classic over-promise.
@@ -58,6 +60,7 @@ export const BATTLE_PLANS: BattlePlan[] = [
     announcedOn: 42,
     start: 52,
     end: 65,
+    winServiceLevel: 0.9,
     depotIds: ['northern-pass'],
     statedUplift: { oats: 1.5, horseshoes: 1.5 },
     // The road was ice and scree. Horses ate more in the cold and threw shoes on every switchback.
@@ -74,6 +77,7 @@ export const BATTLE_PLANS: BattlePlan[] = [
     announcedOn: 70,
     start: 80,
     end: 84,
+    winServiceLevel: 0.9,
     depotIds: ['eastern-camp'],
     statedUplift: { arrows: 1.8, bolts: 1.8, bowstrings: 1.33 },
     actualUplift: { arrows: 1.85, bolts: 1.7, bowstrings: 1.35 },
@@ -88,10 +92,11 @@ export const BATTLE_PLANS: BattlePlan[] = [
     announcedOn: 3,
     start: 14,
     end: 34,
+    winServiceLevel: 0.9,
     depotIds: ['eastern-camp'],
     // No figures in the letter, so the system forecast gets no uplift. The player must override it.
     statedUplift: {},
-    actualUplift: { grain: 1.5, ale: 1.6, bandages: 1.3 },
+    actualUplift: { grain: 1.75, ale: 1.8, bandages: 1.4 },
   },
 ];
 
@@ -99,17 +104,12 @@ export const BATTLE_PLANS_BY_ID: Record<BattlePlanId, BattlePlan> = Object.fromE
   BATTLE_PLANS.map((p) => [p.id, p]),
 );
 
-/** The battle each plan culminates in. Flavour plus the supply bar to clear (see `winServiceLevel`). */
+/** Flavour for the battle each plan culminates in. The win threshold is BattlePlan.winServiceLevel. */
 export interface Battle {
   battlePlanId: BattlePlanId;
   name: string;
   /** Items whose supply decides the day (shown to the player as the battle's needs). */
   keyItems: string[];
-  /**
-   * Proposed service level to the plan's depots over its window needed to win. The engine currently
-   * uses one global rules.rank.battleWinServiceLevel; this is content's per-battle proposal.
-   */
-  winServiceLevel: number;
   victory: string;
   defeat: string;
 }
@@ -119,7 +119,6 @@ export const BATTLES: Record<BattlePlanId, Battle> = {
     battlePlanId: 'harrowmere-assault',
     name: 'The Storming of Harrowmere',
     keyItems: ['arrows', 'pitch', 'siege-rope', 'bandages'],
-    winServiceLevel: 0.92,
     victory: 'The gatehouse burned, the ladders held, and our banner flies over Harrowmere.',
     defeat: 'The archers ran dry by noon and the ladders came down without rope. Harrowmere stands.',
   },
@@ -127,7 +126,6 @@ export const BATTLES: Record<BattlePlanId, Battle> = {
     battlePlanId: 'feast-muster',
     name: "The Duke's Muster",
     keyItems: ['ale', 'grain'],
-    winServiceLevel: 0.85,
     victory: 'The Duke drank deep and pledged three more lances to the war.',
     defeat: 'The casks ran dry before the toasts. The Duke rode home in a temper, and his lances went with him.',
   },
@@ -135,7 +133,6 @@ export const BATTLES: Record<BattlePlanId, Battle> = {
     battlePlanId: 'winter-crossing',
     name: 'The Crossing of the Northern Pass',
     keyItems: ['oats', 'horseshoes'],
-    winServiceLevel: 0.9,
     victory: 'Every horse came over the pass shod and fed. The enemy never saw us coming.',
     defeat: 'Lame and starving horses littered the switchbacks. Half the cavalry turned back.',
   },
@@ -143,7 +140,6 @@ export const BATTLES: Record<BattlePlanId, Battle> = {
     battlePlanId: 'ford-feint',
     name: 'The Feint at Brackenford',
     keyItems: ['arrows', 'bolts', 'bowstrings'],
-    winServiceLevel: 0.9,
     victory: 'Our volleys never slackened. The enemy swallowed the bait and marched south.',
     defeat: 'The volleys thinned and the enemy saw through the feint.',
   },
@@ -151,7 +147,6 @@ export const BATTLES: Record<BattlePlanId, Battle> = {
     battlePlanId: 'levies-arrive',
     name: 'Feeding the Levies',
     keyItems: ['grain', 'ale'],
-    winServiceLevel: 0.9,
     victory: "The Earl's levies were fed from the first night. They will follow you anywhere.",
     defeat: "The levies went hungry and began to desert. The Earl's goodwill is spent.",
   },

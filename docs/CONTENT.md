@@ -23,19 +23,34 @@ produces the same numbers.
   Poisson demand. Faster ones use Gaussian noise with the item's coefficient of variation.
 - **Vendor `reliability`** is the chance that a delivery arrives on time and in full (1 = never
   fails), as the contract now states.
-- **Vendor `minimum.surcharge`** is a flat silver fee for accepting an order below the minimum:
-  fletchers 15, smithy 40, armory 60.
+- **Vendor `orderTrigger`** (vendors with a minimum): the share of the minimum that the real
+  must-order need has to reach before the system builds the order up to the minimum (RELEX_RULES §4).
+  Fletchers 0.5 (builds readily), armory 0.6, smithy 0.8. At 0.8, a small garrison's need never
+  fires the smithy trigger, so the player has to lower it. There are no surcharges any more.
+- **`minimumFill`** is the player's floor. MOP = max(safety stock, minimumFill). It is set where the
+  lesson needs it: level III grain (30, above safety stock) and level IX Harrowmere bandages (20).
 - **Split shares** are re-normalised per scenario over the vendors present. If only one source
   remains, `splitShare` is dropped.
 - **Opening stock** is `mean × onHandDays`, capped at half the shelf life for perishables.
-- **Period allowance** is the expected base spend at the cheapest source × the period length × a
-  per-level factor (1.5 in levels I–II, 1.1–1.3 after that, 1.35 in the sandbox), rounded to two significant figures (sandbox: 83,000). Battle-plan
-  uplift is not included, so letters create budget pressure. A final period cut short by the
-  scenario end gets a pro-rated allowance.
-- **Balance targets** (accept every proposal, checked against the real engine): service ≥ 95% on
-  every level; levels I–VI use about 50–80% of the allowance; the sandbox uses 76–96% per period.
-  Level VII goes over on purpose: about 7% in period 1 and 37% in period 2. Most of the period-2
-  overspend comes from the post-assault forecast (see the engine note below).
+- **Period allowance** = expected spend per day × period length × a per-level `allowanceFactor`,
+  rounded to two significant figures. Expected spend is base demand **plus the actual battle-plan
+  surges**, at the cheapest source, averaged over the campaign. `rules.difficulty.budgetFactor`
+  is applied on top (easy 1.15, normal 1, hard 0.85). A final period cut short by the scenario end
+  gets a pro-rated allowance.
+
+## Balance (market-driven demand, synthetic KO/AAPL/TSLA snapshots)
+
+Checked against the real engine with two strategies. **Accept-all** accepts every proposal.
+**Careful** also judges each letter correctly (stated uplift = actual uplift). Levels that teach
+`order trigger` are also checked with every trigger lowered to 0.5, as the lead's tests do.
+
+| Level | Accept-all, easy / normal / hard | Notes |
+|---|---|---|
+| I–V, VII | service 97–100%, budget used 46–100% | No letters beyond commendations. |
+| VI (trigger) | service ~42% at the default 0.8 trigger (no proposal ever fires); 100% with trigger 0.5 | Lesson: lower the smith's trigger. |
+| VIII (override) | service 95.8 / 97.3 / 97.8%; levies battle won at 94–97% | Accept-all must stay ≥ 95%, so the unannounced surge (grain ×1.75, ale ×1.8) is kept moderate. Careful: 99%. |
+| IX (letters, budget) | easy and normal: battles won, rank 2 → 4, no reprimands. Hard: 2 reprimands (136% / 109% of budget) | The careful player stays on budget on normal; on hard they are still reprimanded but win both battles. |
+| Sandbox | easy and normal: rank 2 → 4, **winter crossing lost** (understated letter). Hard: 2 reprimands, crossing lost, rank 3 | Careful: rank 6 on normal, rank 5 on hard, all 4 battles won. |
 
 ## Items
 
@@ -61,11 +76,11 @@ produces the same numbers.
 | id | Name | Order days | LT | Minimum | Reliability |
 |---|---|---|---|---|---|
 | abbey-granary | St. Aldric's Abbey Granary | Mon, Thu | 3 | — | 0.95 |
-| guild-fletchers | Worshipful Guild of Fletchers | Tue | 5 | 120 units (+15 surcharge) | 0.90 |
-| mountain-smithy | Ironhollow Mountain Smithy | Wed | 7 | 250 silver (+40 surcharge) | 0.80 |
+| guild-fletchers | Worshipful Guild of Fletchers | Tue | 5 | 120 units, trigger 0.5 | 0.90 |
+| mountain-smithy | Ironhollow Mountain Smithy | Wed | 7 | 250 silver, trigger **0.8** | 0.80 |
 | river-merchants | Merchants of the Silverwash | Mon, Wed, Fri | 2 | — | 0.75 |
 | apothecary | Brother Fennick's Apothecary | Mon–Sat | 1 | — | 0.97 |
-| royal-armory | Royal Armory of Kingsreach | Fri | 4 | 400 silver (+60 surcharge) | 0.99 |
+| royal-armory | Royal Armory of Kingsreach | Fri | 4 | 400 silver, trigger 0.6 | 0.99 |
 
 ## Multi-sourcing
 
@@ -85,6 +100,12 @@ produces the same numbers.
 | feast-muster | eastern-camp | d22 → d32–34 | ale 3, grain 1.5 | 1.6, 1.15 | exaggerated |
 | winter-crossing | northern-pass | d42 → d52–65 | oats 1.5, horseshoes 1.5 | 2.1, 2.6 | **under-stated** |
 | ford-feint | eastern-camp | d70 → d80–84 | arrows 1.8, bolts 1.8, bowstrings 1.33 | 1.85, 1.7, 1.35 | accurate |
+| levies-arrive | eastern-camp | d3 → d14–34 | *(no figures)* | grain 1.75, ale 1.8, bandages 1.4 | **silent**: needs a forecast override |
+
+Each plan ends in a battle. `BattlePlan.winServiceLevel` is the service level its depots need
+over the window to win: the assault needs 0.92, the feast 0.85, and the others 0.9. `BATTLES` in
+`battlePlans.ts` holds the flavour: name, key items, and victory and defeat lines (rendered by the
+store's `selectLetterText`).
 
 ## Tutorial campaign
 
@@ -92,16 +113,27 @@ produces the same numbers.
 |---|---|---|---|---|---|
 | I | tutorial-1 | forecast, projected stock, order proposal | bandages @ eastern-camp | apothecary | 14 |
 | II | tutorial-2 | lead time, order days, D1, D2 | grain @ eastern-camp | abbey | 21 |
-| III | tutorial-3 | safety stock, service level, presentation stock, MOP | grain (steady, SL 0.98, pres. 20), hardtack (volatile, SL 0.9) @ harrowmere | abbey | 28 |
+| III | tutorial-3 | safety stock, service level, minimum fill, MOP = max(SS, minimumFill) | grain (steady, minimumFill 30), hardtack (volatile) @ harrowmere | abbey | 28 |
 | IV | tutorial-4 | pack size, rounding, shelf life, spoilage | ale (pack 12, 10-day life), salt pork, hardtack @ eastern-camp | abbey, river | 28 |
-| V | tutorial-5 | vendor minimums, COP, must vs can | arrows, bowstrings (fletchers, units min); horseshoes, mail rings (smithy, value min) @ northern-pass | fletchers, smithy | 28 |
-| VI | tutorial-6 | multi-sourcing: priority, split, reliability | grain, oats, arrows @ eastern-camp | abbey, river, fletchers, armory | 35 |
-| VII | tutorial-7 | battle plans, uplift trust, budget pressure | arrows (guild only), pitch, rope, bandages, grain @ harrowmere; grain, ale @ eastern-camp | 5 vendors | 56 |
+| V | tutorial-5 | vendor minimum, **order trigger**, build-up | arrows, bowstrings @ northern-pass (need ≈ 58% of the 120-unit minimum; trigger 0.5, so it builds) | fletchers | 28 |
+| VI | tutorial-6 | **order trigger**: below the trigger no proposal appears; adjust it | horseshoes, mail rings @ northern-pass (need ≈ 50% of 250 silver; trigger 0.8, so it never fires) | smithy | 28 |
+| VII | tutorial-7 | multi-sourcing: priority, split, reliability | grain, oats, arrows @ eastern-camp | abbey, river, fletchers, armory | 35 |
+| VIII | tutorial-8 | **forecast override** (daily or aggregate), SWAPE/bias | grain, ale, bandages @ eastern-camp + the silent `levies-arrive` letter | abbey, river, apothecary | 35 |
+| IX | tutorial-9 | battle plans, trusting the letter, budget, fiscal period, rank | arrows (guild only), pitch, rope, bandages, grain @ harrowmere; grain, ale @ eastern-camp | 5 vendors | 56 |
 | — | sandbox | everything | all 14 items × 3 depots (38 locations) | all 6 | 112 |
 
-In level V, typical weekly volume is under each vendor's minimum: fletchers about 70 units against
-a minimum of 120, and the smithy about 185 silver against 250. This forces a top-up with can-order
-items, which is the lesson of the level.
+## Ranks, letters, difficulty (`ranks.ts`)
+
+- `RANKS` / `RANK_TITLES` (levels 0–6): Sutler's Boy, Clerk of Stores, Sergeant of Stores (start),
+  Master of Wagons, Quartermaster, Quartermaster of the Host, Quartermaster-General. Insignia keys
+  are `rank.0`–`rank.6`. `rankTitle(level)` clamps out-of-range levels.
+- `SENDERS`: Lord Marshal Edric Vane, Dame Isolde Marrow (Treasury), King Aldwin III, plus the
+  steward and the captain who sign battle-plan letters.
+- `LETTER_TEMPLATES[kind](ctx)` returns `{ from, subject, body }` for every `LetterKind`. The ctx
+  fields are rankTitle, period, committed, allowance, reprimands, serviceLevel, battleTitle and
+  battleLine (from `BATTLES`).
+- `DIFFICULTY_FLAVOUR`: title and description for easy, normal and hard. The tickers and budget
+  factors themselves are in `rules.difficulty`.
 
 ## Curated assets (in `public/assets/`)
 
