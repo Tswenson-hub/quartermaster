@@ -10,21 +10,20 @@ export const isOverrideLesson = (scenario: Scenario) => scenario.teaches.include
 
 /**
  * The player action a lesson expects, applied before accept-all (mirrors tests/store/playthrough.test.ts):
- * - 'order trigger': lower every vendor's trigger to the rules default (via acceptAll's lowerTriggers);
+ * - 'order trigger': at takeover, lower every vendor's trigger to the rules default (acceptAll's
+ *   lowerTriggers). The warm-up plays the scenario's triggers as given: the player inherits the mess;
  * - 'forecast override': override the surge correctly, simulated as statedUplift = actualUplift.
  */
 export function asPlayerWouldFix(scenario: Scenario): { scenario: Scenario; lowerTriggers: boolean; note: string } {
   const lowerTriggers = isTriggerLesson(scenario);
   const override = isOverrideLesson(scenario);
-  const fixed: Scenario = override
-    ? {
-        ...scenario,
-        initial: {
-          ...scenario.initial,
-          battlePlans: scenario.initial.battlePlans.map((b) => ({ ...b, statedUplift: b.actualUplift })),
-        },
-      }
-    : scenario;
+  let fixed: Scenario = scenario;
+  if (override) {
+    fixed = {
+      ...fixed,
+      initial: { ...fixed.initial, battlePlans: fixed.initial.battlePlans.map((b) => ({ ...b, statedUplift: b.actualUplift })) },
+    };
+  }
   const note = lowerTriggers ? ' (triggers lowered)' : override ? ' (surge overridden)' : '';
   return { scenario: fixed, lowerTriggers, note };
 }
@@ -49,7 +48,9 @@ export function acceptAll(scenario: Scenario, lowerTriggers = false): GameState 
   return s;
 }
 
+/** Service level from takeover (the player's days); warm-up days belong to the previous quartermaster. */
 export const serviceLevel = (s: GameState) => {
-  const demand = s.kpis.reduce((a, k) => a + k.demand, 0);
-  return demand === 0 ? 1 : s.kpis.reduce((a, k) => a + k.fulfilled, 0) / demand;
+  const rows = s.kpis.filter((k) => k.day >= (s.startDay ?? 0));
+  const demand = rows.reduce((a, k) => a + k.demand, 0);
+  return demand === 0 ? 1 : rows.reduce((a, k) => a + k.fulfilled, 0) / demand;
 };
