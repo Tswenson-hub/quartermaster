@@ -48,6 +48,8 @@ export function state(extra: Partial<GameState> = {}): GameState {
     difficulty: 'normal',
     market: { ticker: 'FLAT', source: 'snapshot', synthetic: true, firstDate: '', lastDate: '', values: Array<number>(56).fill(1) },
     vendorTriggers: {},
+    vendorOrderDays: {},
+    deliveries: [],
     vendorPlans: [],
     rank: { level: 2, merit: 0, reprimands: 0, overspentStreak: 0 },
     letters: [],

@@ -8,6 +8,7 @@ import type {
   ForecastOverride,
   GameState,
   ItemId,
+  OrderSchedule,
   ProposalDecision,
   ProposalDecisionInput,
   Scenario,
@@ -18,7 +19,7 @@ import { loadMarketSeries, snapshotSeries, toMarketSignal, type MarketSeries } f
 
 export const SAVE_KEY = 'quartermaster-save';
 /** Bump when GameState changes shape; older saves are discarded. */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface DecisionEntry {
   decision: ProposalDecision;
@@ -53,6 +54,11 @@ export interface GameStore {
   decideProposal(index: number, decision: ProposalDecision, qty?: number): void;
   /** Player's order trigger for a vendor with a minimum (fraction of the minimum); null restores the default. */
   setVendorTrigger(vendorId: VendorId, trigger: number | null): void;
+  /**
+   * Player's order-day schedule for a vendor: every day, or weekly on a chosen weekday; null restores the
+   * vendor's own order days. Moves review period, safety stock, MOP and D2; redraws today's proposals.
+   */
+  setVendorOrderDays(vendorId: VendorId, schedule: OrderSchedule | null): void;
   /** Add a forecast override. It IS the forecast on its days until deleted (RELEX_RULES §8). */
   setForecastOverride(input: OverrideInput): void;
   deleteOverride(match: OverrideMatch): void;
@@ -136,6 +142,17 @@ export const useGameStore = create<GameStore>()(
             if (trigger === null) delete vendorTriggers[vendorId];
             else vendorTriggers[vendorId] = Math.max(0, trigger);
             return { ...g, vendorTriggers };
+          }),
+
+        setVendorOrderDays: (vendorId, schedule) =>
+          updateGame((g) => {
+            if (schedule?.kind === 'weekly' && !(Number.isInteger(schedule.weekday) && schedule.weekday >= 0 && schedule.weekday <= 6)) {
+              return g;
+            }
+            const vendorOrderDays = { ...g.vendorOrderDays };
+            if (schedule === null) delete vendorOrderDays[vendorId];
+            else vendorOrderDays[vendorId] = schedule;
+            return { ...g, vendorOrderDays };
           }),
 
         setForecastOverride: (input) => addOverride(toOverride(input)),

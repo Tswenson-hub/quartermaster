@@ -165,3 +165,25 @@ describe('M2 store actions', () => {
     expect(useGameStore.getState().game!.today).toBe(0);
   });
 });
+
+describe('vendor order-day schedule', () => {
+  it('sets, replaces and clears a per-vendor schedule, clearing decisions', () => {
+    const s = useGameStore.getState();
+    s.loadScenario(fixtureScenario);
+    s.decideProposal(0, 'accepted');
+    s.setVendorOrderDays('mill', { kind: 'daily' });
+    expect(useGameStore.getState().game!.vendorOrderDays).toEqual({ mill: { kind: 'daily' } });
+    expect(useGameStore.getState().decisions).toEqual({});
+    s.setVendorOrderDays('mill', { kind: 'weekly', weekday: 4 });
+    expect(useGameStore.getState().game!.vendorOrderDays).toEqual({ mill: { kind: 'weekly', weekday: 4 } });
+    s.setVendorOrderDays('mill', null);
+    expect(useGameStore.getState().game!.vendorOrderDays).toEqual({});
+  });
+
+  it('ignores an invalid weekday', () => {
+    const s = useGameStore.getState();
+    s.loadScenario(fixtureScenario);
+    s.setVendorOrderDays('mill', { kind: 'weekly', weekday: 9 as never });
+    expect(useGameStore.getState().game!.vendorOrderDays).toEqual({});
+  });
+});
