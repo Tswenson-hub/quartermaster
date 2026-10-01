@@ -135,7 +135,10 @@ export interface OpenOrder {
   qty: number;
   orderedOn: Day;
   deliveryOn: Day;
+  /** Total cost of the line, including `surcharge` if any. */
   cost: number;
+  /** Vendor-minimum surcharge (silver) carried on the first line of a below-minimum order; included in `cost`. */
+  surcharge?: number;
 }
 
 export type ProposalReason = 'must' | 'can' | 'vendor-min-fill' | 'manual';
