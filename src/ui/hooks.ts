@@ -41,6 +41,7 @@ import {
   selectLetterText,
   selectMarketInfo,
   selectPlanningParams,
+  selectRecentExceptions,
   selectProjection,
   selectServiceLevel,
   useGameStore,
@@ -337,13 +338,10 @@ export function useTreasury(): TreasuryView | null {
 
 // ---------------------------------------------------------------- dispatch / KPIs
 
-/**
- * The morning's dispatch: today's exceptions plus last night's events. The engine dates events
- * (stockouts, short-ships, spoilage, late wagons) on the day they happened, i.e. yesterday.
- */
+/** The morning's dispatch: today's exceptions plus last night's events (store's selectRecentExceptions). */
 export function useDispatchExceptions(): PlanningException[] {
   const game = useGame();
-  return useMemo(() => (game ? game.exceptions.filter((e) => e.day >= game.today - 1) : []), [game]);
+  return useMemo(() => (game ? selectRecentExceptions(game) : []), [game]);
 }
 
 /** Days played since the player took command (0 on the takeover morning). */
