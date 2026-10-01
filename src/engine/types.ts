@@ -48,7 +48,9 @@ export interface Vendor {
   /**
    * Set when this "vendor" is an internal distribution centre (a transfer lane), not an outside supplier.
    * Orders against it are transfers: they ship from that DC's on-hand (short-ship if it lacks stock),
-   * cost nothing against the budget, and have no minimum. orderDays/leadTimeDays describe the lane.
+   * cost nothing against the budget (transfer OpenOrders and proposals have cost 0, so they never count in
+   * spend, DailyKpi.spend, FiscalPeriod.committed or DecisionPreview.spend), and have no minimum.
+   * orderDays/leadTimeDays describe the lane. A lane SourcingRule's unitCost is a valuation only.
    */
   dcDepotId?: DepotId;
   /**
