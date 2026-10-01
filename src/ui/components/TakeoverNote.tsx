@@ -9,7 +9,8 @@ export function TakeoverNote() {
   const campaign = useCampaignDay();
   const seen = useUiStore((s) => s.seenTakeover);
   const dismiss = useUiStore((s) => s.dismissTakeover);
-  if (!game || !campaign || seen || campaign.inheritedDays <= 0) return null;
+  // Only on the takeover morning: after that the numbers in it would no longer describe the handover.
+  if (!game || !campaign || seen || campaign.inheritedDays <= 0 || game.today !== game.startDay) return null;
   const inTransit = game.openOrders.length;
 
   return (

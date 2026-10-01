@@ -15,6 +15,9 @@ test('app loads', async ({ page }) => {
 });
 
 test('tutorial 1: accept proposals for 7 days with no stockout', async ({ page }) => {
+  // Any uncaught error (e.g. a crashed render) fails the run, even if the asserted elements happen to exist.
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
   await page.getByTestId('start-scenario-tutorial-1').click();
   // The game opens on Dispatch; proposals live on their own screen.
   await page.getByRole('navigation', { name: 'Screens' }).getByRole('button', { name: /Order Proposals/ }).click();
@@ -26,4 +29,5 @@ test('tutorial 1: accept proposals for 7 days with no stockout', async ({ page }
     await page.getByTestId('end-day').click();
   }
   await expect(page.getByTestId('kpi-service-level')).toContainText('100');
+  expect(errors).toEqual([]);
 });

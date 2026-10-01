@@ -5,7 +5,7 @@ import { TakeoverNote } from '../components/TakeoverNote';
 import { Panel } from '../components/Panel';
 import { Term } from '../components/Term';
 import { fmtDay, fmtQty } from '../format';
-import { useExceptionsToday, useGame, useLetterTexts } from '../hooks';
+import { useDispatchExceptions, useGame, useLetterTexts } from '../hooks';
 import { LetterSeal } from './LettersScreen';
 import { useUiStore } from '../uiStore';
 
@@ -25,13 +25,13 @@ const SEVERITY_RANK = { critical: 0, serious: 1, warning: 2, info: 3 };
 
 export function DispatchScreen() {
   const game = useGame();
-  const today = useExceptionsToday();
+  const today = useDispatchExceptions();
   const { go, planItem, openLetter } = useUiStore();
   const read = useUiStore((s) => s.readLetters);
   const commandLetters = useLetterTexts().filter(({ letter }) => !read[letter.id]);
   if (!game) return null;
 
-  const earlier = game.exceptions.filter((e) => e.day < game.today).sort((a, b) => b.day - a.day).slice(0, 8);
+  const earlier = game.exceptions.filter((e) => e.day < game.today - 1).sort((a, b) => b.day - a.day).slice(0, 8);
   const arrivals = game.openOrders.filter((o) => o.deliveryOn === game.today + 1);
   const letters = game.battlePlans.filter((b) => b.announcedOn === game.today);
   const byKind = new Map<ExceptionKind, PlanningException[]>();
@@ -63,7 +63,7 @@ export function DispatchScreen() {
           </div>
           <div className="dispatch-msg">{e.message}</div>
         </div>
-        <span className="muted dispatch-day">{fmtDay(e.day)}</span>
+        <span className="muted dispatch-day">{e.day === game.today - 1 ? 'last night' : fmtDay(e.day)}</span>
         {clickable && (
           <button type="button" className="btn btn-small" onClick={() => act(e)}>
             Review
@@ -138,9 +138,9 @@ export function DispatchScreen() {
             ))}
           </Panel>
         )}
-        <Panel title="Wagons due tomorrow" flavour="Deliveries arriving at first light.">
+        <Panel title={`Wagons due tomorrow${arrivals.length ? ` (${arrivals.length})` : ''}`} flavour="Deliveries arriving at first light.">
           {arrivals.length ? (
-            <ul className="plain-list">
+            <ul className="plain-list arrivals-list">
               {arrivals.map((o) => (
                 <li key={o.id} className="arrival">
                   <ItemIcon item={game.items[o.itemId]} size={24} />

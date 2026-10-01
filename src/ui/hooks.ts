@@ -33,7 +33,6 @@ import {
   selectD2CheckDay,
   selectDecisionPreview,
   selectDifficultyOptions,
-  selectExceptionsToday,
   selectForecast,
   selectItemLocationRows,
   selectVendorOrderDays,
@@ -338,9 +337,13 @@ export function useTreasury(): TreasuryView | null {
 
 // ---------------------------------------------------------------- dispatch / KPIs
 
-export function useExceptionsToday(): PlanningException[] {
+/**
+ * The morning's dispatch: today's exceptions plus last night's events. The engine dates events
+ * (stockouts, short-ships, spoilage, late wagons) on the day they happened, i.e. yesterday.
+ */
+export function useDispatchExceptions(): PlanningException[] {
   const game = useGame();
-  return useMemo(() => (game ? selectExceptionsToday(game) : []), [game]);
+  return useMemo(() => (game ? game.exceptions.filter((e) => e.day >= game.today - 1) : []), [game]);
 }
 
 /** Days played since the player took command (0 on the takeover morning). */

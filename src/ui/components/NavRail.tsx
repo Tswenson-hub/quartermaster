@@ -1,4 +1,4 @@
-import { useExceptionsToday, useGame, useVendorGroups } from '../hooks';
+import { useDispatchExceptions, useGame, useVendorGroups } from '../hooks';
 import { useUiStore, type Screen } from '../uiStore';
 
 const TABS: { id: Screen; label: string; flavour: string; colour: string }[] = [
@@ -17,7 +17,7 @@ export function NavRail() {
   const opened = useUiStore((s) => s.openedLetters);
   const read = useUiStore((s) => s.readLetters);
   const game = useGame();
-  const exceptions = useExceptionsToday();
+  const exceptions = useDispatchExceptions();
   const groups = useVendorGroups();
 
   const undecided = groups.reduce((a, g) => a + g.lines.filter((l) => !l.decision).length, 0);

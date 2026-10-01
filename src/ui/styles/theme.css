@@ -660,6 +660,12 @@ input[type='number'] {
 .dispatch-earlier .dispatch-row {
   opacity: 0.75;
 }
+.arrivals-list {
+  position: relative;
+  z-index: 1;
+  max-height: 480px;
+  overflow-y: auto;
+}
 .arrival {
   display: grid;
   grid-template-columns: auto 1fr;

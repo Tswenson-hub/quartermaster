@@ -110,11 +110,17 @@ function ItemDetail({ game, loc }: { game: GameState; loc: ItemLocation }) {
             <strong>{fmtQty(params.mustOrderPoint)}</strong>.{' '}
             {params.projectedAtD2 < 0 && (
               <>
-                That is <Term k="shortfall">{`${fmtQty(-params.projectedAtD2)} ${item.unit}s short`}</Term>: the men go
-                hungry.{' '}
+                That is <Term k="shortfall">{`${fmtQty(-params.projectedAtD2)} ${item.unit}s short`}</Term>
+                {dcLoc ? ': the depots’ transfers would be short-shipped.' : ': the men go hungry.'}{' '}
               </>
             )}
-            {!belowMop ? 'No order needed to stay safe.' : params.projectedAtD2 < 0 ? 'You must order today.' : 'You must order today or the men go without.'}
+            {!belowMop
+              ? 'No order needed to stay safe.'
+              : params.projectedAtD2 < 0
+                ? 'You must order today.'
+                : dcLoc
+                  ? 'You must order today or the depots’ transfers will run short.'
+                  : 'You must order today or the men go without.'}
           </p>
         )}
         <PlanningCharts view={view} unit={item.unit} dc={dcLoc} battlePlans={game.battlePlans.filter((b) => b.announcedOn <= game.today && b.depotIds.includes(loc.depotId))} />

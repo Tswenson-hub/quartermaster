@@ -79,7 +79,7 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
           <VendorTile id={vendor.id} name={vendor.name} />
           {lane ? (
             <>
-              <Term k="transfer">Transfer</Term> from {dc?.name ?? vendor.dcDepotId}
+              <Term k="transfer">Transfer</Term> · {vendor.name}
             </>
           ) : (
             vendor.name
@@ -93,6 +93,7 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
       }
       flavour={
         <>
+          {lane && <>Ships from {dc?.name ?? vendor.dcDepotId} stock · </>}
           <Term k="orderDay">Orders</Term> {fmtOrderDays(group.orderDays)}
           {group.customSchedule && <span className="your-schedule"> (your schedule)</span>} ·{' '}
           <Term k="leadTime">lead time</Term> {vendor.leadTimeDays} days · reliability {Math.round(vendor.reliability * 100)}%
