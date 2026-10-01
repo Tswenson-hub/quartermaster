@@ -6,11 +6,15 @@ import type {
   ForecastPoint,
   GameState,
   ItemId,
+  ItemLocationStats,
   Letter,
   OpenOrder,
   PlanningException,
   PlanningParams,
   ProposalDecisionInput,
+  VendorId,
+  VendorStats,
+  Weekday,
 } from '../engine/types';
 import type { DecisionEntry } from './gameStore';
 import { kpiSummary, type KpiSummary } from '../engine/kpi';
@@ -135,4 +139,19 @@ export function selectLetterText(game: GameState, letter: Letter): LetterText {
     battleTitle: battle?.name ?? plan?.title,
     battleLine: letter.kind === 'battle-won' ? battle?.victory : letter.kind === 'battle-lost' ? battle?.defeat : undefined,
   });
+}
+
+/** Master Data: one row per item-location (averages, forecast, SS/MOP, days of supply, service). Engine-computed. */
+export function selectItemLocationRows(game: GameState): ItemLocationStats[] {
+  return engine.itemLocationStats(game);
+}
+
+/** Master Data: one row per vendor (master data + performance + order schedule). Engine-computed. */
+export function selectVendorRows(game: GameState): VendorStats[] {
+  return engine.vendorStats(game);
+}
+
+/** A vendor's order weekdays in effect, after the player's schedule override. */
+export function selectVendorOrderDays(game: GameState, vendorId: VendorId): Weekday[] {
+  return engine.effectiveOrderDays(game, vendorId);
 }

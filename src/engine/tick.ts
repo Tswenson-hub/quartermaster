@@ -76,6 +76,9 @@ export function initGame(scenario: Scenario, setup?: GameSetup, r: Rules = defau
       values: Array<number>(scenario.lengthDays).fill(1),
     },
     vendorTriggers: {},
+    // TODO(engine): placeholder defaults added by lead with the master-data contract.
+    vendorOrderDays: {},
+    deliveries: [],
     vendorPlans: [],
     rank: { level: rankLevel ?? r.rank.startLevel, merit: 0, reprimands: 0, overspentStreak: 0 },
     letters: [],

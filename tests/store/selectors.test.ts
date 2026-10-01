@@ -76,3 +76,21 @@ describe('selectLetterText', () => {
     expect(text.subject + text.body).toContain(rankTitle(3));
   });
 });
+
+// Master data. These need the engine implementation (stubs return no rows), so they skip until it lands.
+describe('master data selectors', async () => {
+  const { selectItemLocationRows, selectVendorRows, selectVendorOrderDays } = await import('../../src/store/selectors');
+  const implemented = engine.vendorStats(engine.initGame(fixtureScenario)).length > 0;
+
+  it.skipIf(!implemented)('one row per item-location and per vendor', () => {
+    const game = engine.initGame(fixtureScenario);
+    expect(selectItemLocationRows(game)).toHaveLength(game.locations.length);
+    expect(selectVendorRows(game).map((v) => v.vendorId).sort()).toEqual(Object.keys(game.vendors).sort());
+  });
+
+  it.skipIf(!implemented)('order-day override is reflected in effective days and vendor rows', () => {
+    const game = { ...engine.initGame(fixtureScenario), vendorOrderDays: { mill: { kind: 'daily' as const } } };
+    expect(selectVendorOrderDays(game, 'mill')).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(selectVendorRows(game).find((v) => v.vendorId === 'mill')!.orderDays).toHaveLength(7);
+  });
+});

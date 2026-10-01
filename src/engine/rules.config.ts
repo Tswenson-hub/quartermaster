@@ -68,6 +68,8 @@ export interface Rules {
   };
   /** §10 KPIs. Days of supply = on hand ÷ mean daily forecast over the next `daysOfSupplyHorizon` days. */
   kpi: { daysOfSupplyHorizon: number };
+  /** Master Data screen windows: average sales over the last N days, average forecast over the next N days. */
+  masterData: { salesWindowDays: number; forecastWindowDays: number };
   exceptions: {
     /** Flag forecast-deviation when |actual − forecast| / forecast exceeds this. */
     forecastDeviationPct: number;
@@ -159,6 +161,7 @@ export const rules: Rules = {
   mustOrderMinOnePack: true,
   demand: { baseWindow: 28, noiseCv: 0.1 },
   kpi: { daysOfSupplyHorizon: 7 },
+  masterData: { salesWindowDays: 28, forecastWindowDays: 7 },
   exceptions: { forecastDeviationPct: 0.3 },
   spoilage: { mode: 'lots' },
   delivery: { lateDaysMin: 1, lateDaysMax: 2 },

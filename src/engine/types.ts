@@ -156,9 +156,32 @@ export interface OpenOrder {
   vendorId: VendorId;
   qty: number;
   orderedOn: Day;
+  /** Current expected arrival; moves later if the delivery is late. */
   deliveryOn: Day;
   cost: number;
+  /** Due date when placed, before any delay. Absent (legacy/fixtures) = orderedOn + vendor lead time. */
+  promisedOn?: Day;
 }
+
+/** A received order, kept for vendor performance. tick appends one per receipt. */
+export interface DeliveryRecord {
+  orderId: string;
+  itemId: ItemId;
+  depotId: DepotId;
+  vendorId: VendorId;
+  qty: number;
+  cost: number;
+  orderedOn: Day;
+  promisedOn: Day;
+  /** Late when receivedOn > promisedOn. */
+  receivedOn: Day;
+}
+
+/**
+ * Player override of a vendor's order calendar (per vendor). Absent = Vendor.orderDays.
+ * Changing it changes the review period, so safety stock, MOP and D2 move with it.
+ */
+export type OrderSchedule = { kind: 'daily' } | { kind: 'weekly'; weekday: Weekday };
 
 export type ProposalReason = 'must' | 'can' | 'vendor-min-fill' | 'manual';
 
@@ -354,6 +377,10 @@ export interface GameState {
   market: MarketSignal;
   /** Player overrides of vendor order triggers (RELEX_RULES §4). Absent = vendor/rules default. */
   vendorTriggers: Record<VendorId, number>;
+  /** Player overrides of vendor order days. Absent = the vendor's own orderDays. */
+  vendorOrderDays: Record<VendorId, OrderSchedule>;
+  /** Every received order, oldest first (vendor performance). */
+  deliveries: DeliveryRecord[];
   /** Today's vendor-minimum trigger results, one per vendor with a proposal or a minimum. */
   vendorPlans: VendorPlan[];
   rank: RankState;
@@ -374,6 +401,8 @@ export type RuntimeField =
   | 'difficulty'
   | 'market'
   | 'vendorTriggers'
+  | 'vendorOrderDays'
+  | 'deliveries'
   | 'vendorPlans'
   | 'rank'
   | 'letters'
@@ -469,4 +498,81 @@ export interface EngineApi {
    * with today+1 and fresh proposals + vendorPlans + exceptions. No-op once status !== 'playing'.
    */
   tick(state: GameState): GameState;
+  /** A vendor's order weekdays after the player's override (GameState.vendorOrderDays). */
+  effectiveOrderDays(state: GameState, vendorId: VendorId): Weekday[];
+  /** Master data + derived figures, one row per GameState.locations entry, same order. */
+  itemLocationStats(state: GameState): ItemLocationStats[];
+  /** Master data + performance, one row per vendor. */
+  vendorStats(state: GameState): VendorStats[];
+}
+
+/** Master-data row for one item-location (Master Data screen). Computed by the engine. */
+export interface ItemLocationStats {
+  itemId: ItemId;
+  depotId: DepotId;
+  /** Current source (the vendor the next order would go to); undefined if the item has no usable source. */
+  vendorId?: VendorId;
+  onHand: number;
+  /** Mean daily actual demand over the last rules.masterData.salesWindowDays of history. */
+  avgDailySales: number;
+  /** Mean daily forecast total over today .. today + rules.masterData.forecastWindowDays − 1. */
+  avgForecastNext: number;
+  safetyStock?: number;
+  minimumFill: number;
+  mustOrderPoint?: number;
+  /** Next order opportunity for this item (today or later). */
+  orderDay?: Day;
+  /** Days from that order opportunity to the following one. */
+  reviewPeriodDays?: number;
+  leadTimeDays?: number;
+  packSize?: number;
+  unitCost?: number;
+  /** On hand ÷ mean daily forecast; Infinity when there is no forecast. */
+  daysOfSupply: number;
+  /** Campaign-to-date actual demand and units fulfilled at this location. */
+  campaignDemand: number;
+  campaignFulfilled: number;
+  /** campaignFulfilled ÷ campaignDemand; null before any campaign demand. */
+  serviceLevelToDate: number | null;
+}
+
+/**
+ * Master-data and performance row for one vendor. Performance counts campaign orders only
+ * (orderedOn ≥ 0); a scenario's opening orders are excluded.
+ */
+export interface VendorStats {
+  vendorId: VendorId;
+  /** The vendor's own order weekdays (master data). */
+  defaultOrderDays: Weekday[];
+  /** Order weekdays in effect (after the player's schedule override). */
+  orderDays: Weekday[];
+  /** The player's override, if any. */
+  schedule?: OrderSchedule;
+  /** Next order opportunity, today or later. */
+  nextOrderDay?: Day;
+  leadTimeDays: number;
+  reliability: number;
+  minimum?: Vendor['minimum'];
+  /** Effective order trigger, and whether the player has overridden it. */
+  trigger: number;
+  customTrigger: boolean;
+  /** Distinct items this vendor can supply (sourcing rules). */
+  itemsSupplied: number;
+  ordersPlaced: number;
+  unitsOrdered: number;
+  spend: number;
+  delivered: number;
+  onTime: number;
+  late: number;
+  /** onTime ÷ delivered; null before any delivery. */
+  onTimeRate: number | null;
+  /** Mean of receivedOn − orderedOn over delivered orders; null before any delivery. */
+  avgLeadTimeActual: number | null;
+  /** Mean days late over late deliveries; null when none were late. */
+  avgDaysLate: number | null;
+  openOrders: number;
+  openUnits: number;
+  openValue: number;
+  /** Open orders already past their promised date. */
+  overdueOpen: number;
 }

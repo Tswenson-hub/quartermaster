@@ -13,6 +13,11 @@ export const engine = {
   project: (state, itemId, depotId, from, to) => project(state, itemId, depotId, from, to),
   placeOrders: (state, decisions) => placeOrders(state, decisions),
   tick: (state) => tick(state),
+  // TODO(engine): stubs added by lead with the master-data contract. Replace with calendar.effectiveOrderDays
+  // and masterData.itemLocationStats / vendorStats.
+  effectiveOrderDays: (state, vendorId) => state.vendors[vendorId]?.orderDays ?? [],
+  itemLocationStats: () => [],
+  vendorStats: () => [],
 } satisfies EngineApi;
 
 export { initGame, refresh, forecast, planningParams, project, placeOrders, tick };
