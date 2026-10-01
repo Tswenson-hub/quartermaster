@@ -43,7 +43,7 @@ export function ProposalsScreen() {
           <ul className="plain-list">
             {idle.map((g) => (
               <li key={g.vendor.id} className="idle-vendor">
-                <VendorTile name={g.vendor.name} size={24} />
+                <VendorTile id={g.vendor.id} name={g.vendor.name} size={24} />
                 <span>{g.vendor.name}</span>
                 <span className="muted">
                   <Term k="orderDay">orders</Term> {g.vendor.orderDays.map((d) => weekdayName(d)).join('/')} ·{' '}
@@ -72,7 +72,7 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
       className="vendor-card"
       title={
         <span className="vendor-heading">
-          <VendorTile name={vendor.name} />
+          <VendorTile id={vendor.id} name={vendor.name} />
           {vendor.name}
         </span>
       }

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
 import type { Item, ItemCategory } from '../../engine/types';
+import { Sprite } from './Sprite';
 
-// Placeholder tiles until curated art lands in public/assets/manifest.json. When the manifest
-// has an entry for item.icon, the real sprite is used instead.
+// Real sprites come from public/assets/manifest.json (item.<id>, vendor.<id>); coloured tiles
+// stand in until the manifest lists an icon.
 
 const CATEGORY_COLOUR: Record<ItemCategory, string> = {
   rations: '#b8862f',
@@ -15,45 +15,38 @@ const CATEGORY_COLOUR: Record<ItemCategory, string> = {
   tools: '#55606b',
 };
 
-type Manifest = { icons?: Record<string, string> };
-let manifestPromise: Promise<Manifest> | null = null;
-function loadManifest(): Promise<Manifest> {
-  manifestPromise ??= fetch(`${import.meta.env.BASE_URL}assets/manifest.json`)
-    .then((r) => (r.ok ? r.json() : {}))
-    .catch(() => ({}));
-  return manifestPromise;
-}
-
 export function ItemIcon({ item, size = 32 }: { item: Item | undefined; size?: number }) {
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    if (item) loadManifest().then((m) => live && setSrc(m.icons?.[item.icon] ?? null));
-    return () => {
-      live = false;
-    };
-  }, [item]);
-
   if (!item) return <span className="icon-tile" style={{ width: size, height: size }} />;
-  if (src) {
-    return <img className="icon-img" src={`${import.meta.env.BASE_URL}${src.replace(/^\//, '')}`} width={size} height={size} alt="" />;
-  }
   return (
-    <span
-      className="icon-tile"
-      style={{ width: size, height: size, background: CATEGORY_COLOUR[item.category], fontSize: size * 0.42 }}
-      title={item.category}
-      aria-hidden
-    >
-      {item.name.slice(0, 2).toUpperCase()}
-    </span>
+    <Sprite
+      keys={[`item.${item.id}`, item.icon]}
+      size={size}
+      className="icon-framed"
+      fallback={
+        <span
+          className="icon-tile"
+          style={{ width: size, height: size, background: CATEGORY_COLOUR[item.category], fontSize: size * 0.42 }}
+          title={item.category}
+          aria-hidden
+        >
+          {item.name.slice(0, 2).toUpperCase()}
+        </span>
+      }
+    />
   );
 }
 
-export function VendorTile({ name, size = 28 }: { name: string; size?: number }) {
+export function VendorTile({ id, name, size = 28 }: { id?: string; name: string; size?: number }) {
   return (
-    <span className="icon-tile vendor-tile" style={{ width: size, height: size, fontSize: size * 0.42 }} aria-hidden>
-      {name.slice(0, 1)}
-    </span>
+    <Sprite
+      keys={id ? [`vendor.${id}`] : []}
+      size={size}
+      className="icon-framed"
+      fallback={
+        <span className="icon-tile vendor-tile" style={{ width: size, height: size, fontSize: size * 0.42 }} aria-hidden>
+          {name.slice(0, 1)}
+        </span>
+      }
+    />
   );
 }

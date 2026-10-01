@@ -280,9 +280,14 @@ input {
   background: var(--wood);
   font-family: var(--font-fell);
 }
-.icon-img {
+.sprite {
   image-rendering: pixelated;
   flex-shrink: 0;
+  display: inline-block;
+}
+.sprite.icon-framed {
+  background: var(--parchment-lo);
+  box-shadow: 0 0 0 2px var(--ink);
 }
 
 /* ------------------------------------------------------------------ app shell */

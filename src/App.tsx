@@ -1,9 +1,12 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
+import { BattleReport } from './ui/components/BattleReport';
 import { NavRail } from './ui/components/NavRail';
 import { TopBar } from './ui/components/TopBar';
-import { useGame, useScenarioOver, useServiceLevel } from './ui/hooks';
+import { useGame } from './ui/hooks';
 import { BattlePlansScreen } from './ui/screens/BattlePlansScreen';
 import { DispatchScreen } from './ui/screens/DispatchScreen';
+import { GameOverScreen } from './ui/screens/GameOverScreen';
+import { LettersScreen } from './ui/screens/LettersScreen';
 import { ProposalsScreen } from './ui/screens/ProposalsScreen';
 import { TitleScreen } from './ui/screens/TitleScreen';
 import { useUiStore } from './ui/uiStore';
@@ -17,15 +20,17 @@ const SCREENS = {
   planning: PlanningScreen,
   proposals: ProposalsScreen,
   battle: BattlePlansScreen,
+  letters: LettersScreen,
   treasury: TreasuryScreen,
 };
 
 export default function App() {
   const game = useGame();
   const screen = useUiStore((s) => s.screen);
-  const over = useScenarioOver();
-  const serviceLevel = useServiceLevel();
+  // The end-of-campaign panel replaces the screen until the player chooses to review the ledger.
+  const [reviewing, setReviewing] = useState(false);
   if (!game) return <TitleScreen />;
+  const ended = game.status !== 'playing';
   const Screen = SCREENS[screen];
 
   return (
@@ -34,17 +39,12 @@ export default function App() {
       <div className="app-body">
         <NavRail />
         <main className="content">
-          {over && (
-            <div className="banner">
-              The campaign is over. You kept the army supplied {serviceLevel}% of the time, with morale at{' '}
-              {Math.round(game.morale)}.
-            </div>
-          )}
           <Suspense fallback={<p className="empty loading">Unrolling the ledger…</p>}>
-            <Screen />
+            {ended && !reviewing ? <GameOverScreen onReview={() => setReviewing(true)} /> : <Screen />}
           </Suspense>
         </main>
       </div>
+      <BattleReport />
     </div>
   );
 }
