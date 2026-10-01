@@ -10,8 +10,8 @@ export const isOverrideLesson = (scenario: Scenario) => scenario.teaches.include
 
 /**
  * The player action a lesson expects, applied before accept-all (mirrors tests/store/playthrough.test.ts):
- * - 'order trigger': lower every vendor's trigger to the rules default (in the scenario's vendor data, so
- *   the warm-up runs on it too, and via acceptAll's lowerTriggers);
+ * - 'order trigger': at takeover, lower every vendor's trigger to the rules default (acceptAll's
+ *   lowerTriggers). The warm-up plays the scenario's triggers as given: the player inherits the mess;
  * - 'forecast override': override the surge correctly, simulated as statedUplift = actualUplift.
  */
 export function asPlayerWouldFix(scenario: Scenario): { scenario: Scenario; lowerTriggers: boolean; note: string } {
@@ -22,18 +22,6 @@ export function asPlayerWouldFix(scenario: Scenario): { scenario: Scenario; lowe
     fixed = {
       ...fixed,
       initial: { ...fixed.initial, battlePlans: fixed.initial.battlePlans.map((b) => ({ ...b, statedUplift: b.actualUplift })) },
-    };
-  }
-  if (lowerTriggers) {
-    // Lower the vendors' own triggers too, so the warm-up (the previous quartermaster) also runs on
-    // sane triggers; otherwise the player inherits an army starved by the lesson's high trigger.
-    const trigger = rules.vendorMinimum.defaultTrigger;
-    fixed = {
-      ...fixed,
-      initial: {
-        ...fixed.initial,
-        vendors: Object.fromEntries(Object.entries(fixed.initial.vendors).map(([id, v]) => [id, { ...v, orderTrigger: trigger }])),
-      },
     };
   }
   const note = lowerTriggers ? ' (triggers lowered)' : override ? ' (surge overridden)' : '';
