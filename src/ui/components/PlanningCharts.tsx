@@ -16,7 +16,7 @@ import { fmtDay, fmtQty } from '../format';
 import type { PlanningView } from '../hooks';
 
 // Series colours validated (dataviz validator) against the parchment surface #efe0bd.
-export const SERIES = { projected: '#2c62b0', forecast: '#c0611a', history: '#7a4fa0' };
+const SERIES = { projected: '#2c62b0', forecast: '#c0611a', history: '#7a4fa0' };
 const INK = '#3b2a1a';
 const MUTED = '#7a6648';
 const MOP = '#a8202a';

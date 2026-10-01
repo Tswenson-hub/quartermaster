@@ -1,13 +1,16 @@
+import { lazy, Suspense } from 'react';
 import { NavRail } from './ui/components/NavRail';
 import { TopBar } from './ui/components/TopBar';
 import { useGame, useScenarioOver, useServiceLevel } from './ui/hooks';
 import { BattlePlansScreen } from './ui/screens/BattlePlansScreen';
 import { DispatchScreen } from './ui/screens/DispatchScreen';
-import { PlanningScreen } from './ui/screens/PlanningScreen';
 import { ProposalsScreen } from './ui/screens/ProposalsScreen';
 import { TitleScreen } from './ui/screens/TitleScreen';
-import { TreasuryScreen } from './ui/screens/TreasuryScreen';
 import { useUiStore } from './ui/uiStore';
+
+// Chart screens pull in Recharts; load them on demand to keep the first chunk small.
+const PlanningScreen = lazy(() => import('./ui/screens/PlanningScreen').then((m) => ({ default: m.PlanningScreen })));
+const TreasuryScreen = lazy(() => import('./ui/screens/TreasuryScreen').then((m) => ({ default: m.TreasuryScreen })));
 
 const SCREENS = {
   dispatch: DispatchScreen,
@@ -37,7 +40,9 @@ export default function App() {
               {Math.round(game.morale)}.
             </div>
           )}
-          <Screen />
+          <Suspense fallback={<p className="empty loading">Unrolling the ledger…</p>}>
+            <Screen />
+          </Suspense>
         </main>
       </div>
     </div>
