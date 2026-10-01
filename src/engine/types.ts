@@ -43,9 +43,12 @@ export interface Vendor {
   orderDays: Weekday[];
   /** Days from order to delivery at the depot. */
   leadTimeDays: number;
-  /** Vendor minimum order, if any. */
-  minimum?: { kind: 'value' | 'units'; amount: number };
-  /** Probability (0–1) per delivery of delay / short-ship, for disruption events. */
+  /**
+   * Vendor minimum order, if any. `surcharge` (flat silver) applies when the player accepts
+   * an order below the minimum; without it a short order is not allowed.
+   */
+  minimum?: { kind: 'value' | 'units'; amount: number; surcharge?: number };
+  /** Probability (0–1) a delivery arrives on time and in full. 1 = never fails. */
   reliability: number;
 }
 
@@ -76,6 +79,11 @@ export interface ItemLocation {
   serviceLevel: number;
   /** Minimum presentation / display stock (e.g. "always keep 1 cart at camp"). */
   presentationStock: number;
+  /**
+   * FIFO stock lots, oldest first, for spoilage. When present, sum of qty = onHand.
+   * Optional: when absent the engine treats all stock as received today.
+   */
+  lots?: { qty: number; receivedOn: Day }[];
   /**
    * Actual daily demand, oldest first; the last entry is always yesterday (today − 1).
    * Scenarios seed it with pre-campaign history; tick() appends each day's actual demand.
@@ -166,7 +174,9 @@ export type ExceptionKind =
   | 'forecast-deviation'
   | 'delivery-late'
   | 'over-budget'
-  | 'spoilage';
+  | 'spoilage'
+  /** Actual stockout: demand went unmet on `day`. (stockout-risk is the forward-looking one.) */
+  | 'stockout';
 
 export interface PlanningException {
   kind: ExceptionKind;
@@ -184,6 +194,8 @@ export interface DailyKpi {
   spoiled: number;
   holdingCost: number;
   spend: number;
+  /** Sum over locations of that day's forecast total as of that morning (for MAPE/bias). */
+  forecast?: number;
 }
 
 export interface GameState {
