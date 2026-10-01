@@ -4,6 +4,7 @@ import { baselineFromHistory, forecastLocation } from './forecast';
 import { projectLocation } from './projection';
 import { generatePlanLines, roundToPack } from './replenishment';
 import { actualDemand } from './demand';
+import { updateCareer } from './rank';
 import { addLot, consume, expire, lotsOf } from './lots';
 import { createRng, hashSeed, rngForDay } from './rng';
 import { rules as defaultRules, type Rules } from './rules.config';
@@ -189,9 +190,11 @@ export function placeOrders(state: GameState, decisions: ProposalDecisionInput[]
  * Advance one day. For day t = today, per item-location in order: receive deliveries due,
  * draw actual demand (demand.ts: base rate × market × actual uplift × noise), fulfil
  * (unmet demand is lost), spoil, accrue holding cost. Then morale, period-end budget
- * penalties and the day's KPI row. Returns state for t + 1 with fresh proposals/exceptions.
+ * penalties, the day's KPI row, and career events (rank.ts). Returns state for t + 1 with
+ * fresh proposals/exceptions. No-op once the game is no longer 'playing'.
  */
 export function tick(state: GameState, r: Rules = defaultRules): GameState {
+  if (state.status !== undefined && state.status !== 'playing') return state;
   const t = state.today;
   const rng = rngForDay(state.seed, t);
   const events: PlanningException[] = [];
@@ -321,6 +324,9 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
 
   morale = clamp(morale + r.morale.dailyRecovery, 0, 100);
 
+  const kpis = [...state.kpis, kpi];
+  const career = updateCareer(state, t, kpis, period && period.end === t ? period : undefined, r);
+
   const next: GameState = {
     ...state,
     today: t + 1,
@@ -328,7 +334,11 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
     openOrders,
     periods,
     morale,
-    kpis: [...state.kpis, kpi],
+    kpis,
+    rank: career.rank,
+    letters: [...state.letters, ...career.letters],
+    battles: [...state.battles, ...career.battles],
+    status: career.status,
     exceptions: events.filter((e) => EVENT_KINDS.has(e.kind)),
   };
   const refreshed = refresh(next, r);
