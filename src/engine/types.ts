@@ -405,7 +405,7 @@ export interface GameState {
   vendorOrderDays: Record<VendorId, OrderSchedule>;
   /** Every received order, oldest first (vendor performance). */
   deliveries: DeliveryRecord[];
-  /** Today's vendor-minimum trigger results, one per vendor with a proposal or a minimum. */
+  /** Today's vendor-minimum trigger results: one per vendor whose order day is today (empty on other days). */
   vendorPlans: VendorPlan[];
   rank: RankState;
   /** Letters from command, oldest first. */
