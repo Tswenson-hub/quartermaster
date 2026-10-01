@@ -1,10 +1,22 @@
-import { useGameActions, useScenarioList } from '../hooks';
+import { useState } from 'react';
+import type { Difficulty } from '../../engine/types';
+import { Term } from '../components/Term';
+import { getApiKey, setApiKey, useDifficultyOptions, useGameActions, useScenarioList, useStarting } from '../hooks';
 import { useUiStore } from '../uiStore';
+
+const DIFFICULTY_FLAVOUR: Record<Difficulty, string> = {
+  easy: 'A steady market and a generous Treasurer.',
+  normal: 'Honest weather, honest coin.',
+  hard: 'Wild markets and a miserly purse.',
+};
 
 export function TitleScreen() {
   const scenarios = useScenarioList();
-  const { loadScenario } = useGameActions();
+  const options = useDifficultyOptions();
+  const starting = useStarting();
+  const { newGame } = useGameActions();
   const go = useUiStore((s) => s.go);
+  const [difficulty, setDifficulty] = useState<Difficulty>(options.find((o) => o.id === 'normal')?.id ?? options[0]?.id ?? 'normal');
 
   return (
     <main className="title-screen">
@@ -12,8 +24,32 @@ export function TitleScreen() {
         <h1 className="title-logo">Quartermaster</h1>
         <p className="title-sub">
           The army marches on its stomach. Keep the stores above the <strong>Must Order Point</strong> on the second
-          delivery day, and the banners stay high.
+          delivery day, mind the Treasurer, and the banners stay high.
         </p>
+
+        <h2 className="title-choose">Difficulty</h2>
+        <div className="difficulty-list" role="radiogroup" aria-label="Difficulty">
+          {options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              role="radio"
+              aria-checked={difficulty === o.id}
+              className={`difficulty-card ${difficulty === o.id ? 'on' : ''}`}
+              data-testid={`difficulty-${o.id}`}
+              onClick={() => setDifficulty(o.id)}
+            >
+              <span className="difficulty-label">{o.label}</span>
+              <span className="difficulty-meta">
+                <Term k="market">Market</Term> {o.ticker} · budget ×{o.budgetFactor}
+              </span>
+              <span className="difficulty-flavour">{DIFFICULTY_FLAVOUR[o.id]}</span>
+            </button>
+          ))}
+        </div>
+
+        <MarketKeySettings />
+
         <h2 className="title-choose">Choose a campaign</h2>
         <ul className="scenario-list">
           {scenarios.map((s) => (
@@ -22,8 +58,9 @@ export function TitleScreen() {
                 type="button"
                 className="scenario-card"
                 data-testid={`start-scenario-${s.id}`}
-                onClick={() => {
-                  loadScenario(s);
+                disabled={starting}
+                onClick={async () => {
+                  await newGame(s, difficulty);
                   go('dispatch');
                 }}
               >
@@ -37,6 +74,73 @@ export function TitleScreen() {
           ))}
         </ul>
       </div>
+      {starting && (
+        <div className="starting-overlay" role="status" aria-live="polite">
+          <div className="starting-card panel">
+            <span className="spinner" aria-hidden />
+            Riders sent to the market for the latest prices…
+          </div>
+        </div>
+      )}
     </main>
+  );
+}
+
+/** Optional Alpha Vantage key, kept only in this browser. */
+function MarketKeySettings() {
+  const [saved, setSaved] = useState(() => getApiKey() ?? '');
+  const [draft, setDraft] = useState(saved);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <details className="market-settings" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>
+        Market data:{' '}
+        {saved ? <strong>live (your Alpha Vantage key)</strong> : <strong>bundled snapshot</strong>}
+      </summary>
+      <p className="muted small">
+        Soldiers’ demand follows a real stock’s daily closing prices, scaled to the size of your camps. With a free{' '}
+        <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noreferrer">
+          Alpha Vantage key
+        </a>{' '}
+        the game fetches fresh prices at most once a day. Without one, it uses the prices bundled with the game. The key
+        is stored only in this browser.
+      </p>
+      <form
+        className="key-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const k = draft.trim();
+          setApiKey(k || null);
+          setSaved(k);
+        }}
+      >
+        <input
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Alpha Vantage API key"
+          aria-label="Alpha Vantage API key"
+        />
+        <button type="submit" className="btn btn-small" disabled={draft.trim() === saved}>
+          Save
+        </button>
+        {saved && (
+          <button
+            type="button"
+            className="btn btn-small btn-ghost"
+            onClick={() => {
+              setApiKey(null);
+              setSaved('');
+              setDraft('');
+            }}
+          >
+            Forget key
+          </button>
+        )}
+      </form>
+    </details>
   );
 }
