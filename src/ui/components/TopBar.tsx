@@ -9,7 +9,7 @@ export function TopBar() {
   const over = useScenarioOver();
   const treasury = useTreasury();
   const serviceLevel = useServiceLevel();
-  const { endDay, newGame } = useGameActions();
+  const { endDay, quitGame } = useGameActions();
   const clearDrafts = useUiStore((s) => s.clearDrafts);
   if (!game) return null;
 
@@ -63,7 +63,7 @@ export function TopBar() {
           type="button"
           className="btn btn-ghost"
           onClick={() => {
-            if (confirm('Abandon this campaign? Your progress will be lost.')) newGame();
+            if (confirm('Abandon this campaign? Your progress will be lost.')) quitGame();
           }}
         >
           Abandon

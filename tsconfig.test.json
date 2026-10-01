@@ -3,7 +3,7 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
     "lib": ["ES2023", "DOM"],
-    "types": ["node"]
+    "types": ["node", "vite/client"]
   },
   "include": ["tests", "e2e", "vitest.config.ts", "playwright.config.ts"]
 }

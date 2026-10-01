@@ -30,9 +30,15 @@ Several agents work in parallel, each in its own git worktree/branch. Only edit 
 - Commit small and often on your branch. Lead merges into `main`.
 
 ## Engine ↔ store ↔ UI
-- Engine exposes `EngineApi` (in `types.ts`) from `src/engine/index.ts`: `initGame`, `refresh`, `forecast`, `planningParams`, `project`, `placeOrders`, `tick`.
+- Engine exposes `EngineApi` (in `types.ts`) from `src/engine/index.ts`: `initGame(scenario, setup?)`, `refresh`, `forecast`, `planningParams`, `project`, `placeOrders`, `tick`.
 - `src/store/engine.ts` binds the store to the engine (`import { engine } from "../engine"`).
-- UI imports only from `src/store` (`useGameStore`, `select*` selectors incl. `selectPlanningParams`, `selectServiceLevel`, `selectDecisionPreview`) plus types from `src/engine/types.ts`.
-- Store actions: `loadScenario`, `decideProposal(index, decision, qty?)`, `setOverride`, `clearOverride`, `endDay`, `newGame`. Saves to localStorage key `quartermaster-save`.
+- UI imports only from `src/store` plus types from `src/engine/types.ts` (never `rules.config` or engine modules; ask lead for a selector).
+- Store actions: `newGame(scenario, difficulty)` (async: fetches market), `loadScenario(scenario, difficulty?)` (sync, bundled snapshot; tests/e2e), `decideProposal(index, decision, qty?)`, `setVendorTrigger(vendorId, fraction | null)`, `setForecastOverride({day, qty} | {from, to, total})`, `deleteOverride({itemId, depotId, from?, to?})`, `endDay`, `quitGame`. `setOverride`/`clearOverride` are deprecated aliases. Saves to localStorage key `quartermaster-save` (version 2; older saves are discarded).
+- Selectors: `selectForecast`, `selectProjection`, `selectPlanningParams`, `selectD2CheckDay`, `selectCurrentPeriod`, `selectExceptionsToday`, `selectServiceLevel`, `selectDecisionPreview`, `selectKpiSummary` (service level, days of supply, spoilage, SWAPE, bias), `selectDifficultyOptions`, `selectMarketInfo`.
 - Content exports `scenarios: Scenario[]` from `src/content/index.ts`; tutorial level 1 has id `tutorial-1`.
-- e2e `data-testid`s (UI provides): `start-scenario-<id>`, `proposal-row`, `proposal-accept`, `end-day`, `today`, `morale`, `kpi-service-level`.
+- e2e `data-testid`s (UI provides): `start-scenario-<id>`, `proposal-row`, `proposal-accept`, `end-day`, `today`, `morale`, `kpi-service-level`, `nav-<screen>`.
+
+## Market data (RELEX_RULES §11)
+- Actual demand follows a real stock's daily closes. `src/store/market.ts` fetches Alpha Vantage `TIME_SERIES_DAILY` (key from the in-game setting, localStorage `quartermaster-alphavantage-key`, or `VITE_ALPHAVANTAGE_KEY`). At most one fetch attempt per ticker per calendar day, cached in localStorage. Otherwise it uses bundled snapshots in `src/content/market/`.
+- Refresh snapshots: `ALPHAVANTAGE_KEY=… node scripts/fetch-market.mjs`; `--synthetic` generates labelled placeholder series. The committed snapshots are currently SYNTHETIC.
+- The store passes a `MarketSignal` into `initGame`; the engine stays pure and turns it into demand with `rules.market`. Difficulty presets (ticker + budget factor) live in `rules.difficulty`.

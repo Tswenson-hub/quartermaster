@@ -12,7 +12,7 @@ const { useGameStore, SAVE_KEY, isScenarioOver } = await import('../../src/store
 
 beforeEach(() => {
   memory.clear();
-  useGameStore.getState().newGame();
+  useGameStore.getState().quitGame();
 });
 
 describe('gameStore', () => {
@@ -93,7 +93,7 @@ describe('gameStore', () => {
     await useGameStore.persist.rehydrate();
     expect(useGameStore.getState().game?.today).toBe(1);
 
-    useGameStore.getState().newGame();
+    useGameStore.getState().quitGame();
     expect(memory.has(SAVE_KEY)).toBe(false);
   });
 });
@@ -111,5 +111,57 @@ describe('selectors', () => {
     expect(pp.d1).toBe(5);
     expect(pp.d2).toBe(9); // next order Mon (7) + LT 2
     expect(pp.mustOrderPoint).toBeGreaterThanOrEqual(5);
+  });
+});
+
+describe('M2 store actions', () => {
+  it('loadScenario starts on the bundled snapshot for the difficulty', () => {
+    useGameStore.getState().loadScenario(fixtureScenario, 'hard');
+    const game = useGameStore.getState().game!;
+    expect(game.difficulty).toBe('hard');
+    expect(game.market.ticker).toBe('TSLA');
+    expect(game.market.source).toBe('snapshot');
+    expect(game.market.values).toHaveLength(fixtureScenario.lengthDays);
+  });
+
+  it('newGame without an API key falls back to the snapshot', async () => {
+    await useGameStore.getState().newGame(fixtureScenario, 'easy');
+    const { game, starting } = useGameStore.getState();
+    expect(starting).toBe(false);
+    expect(game!.market.ticker).toBe('KO');
+    expect(game!.market.source).toBe('snapshot');
+  });
+
+  it('setVendorTrigger sets and clears a player trigger', () => {
+    const s = useGameStore.getState();
+    s.loadScenario(fixtureScenario);
+    s.setVendorTrigger('mill', 0.4);
+    expect(useGameStore.getState().game!.vendorTriggers).toEqual({ mill: 0.4 });
+    s.setVendorTrigger('mill', null);
+    expect(useGameStore.getState().game!.vendorTriggers).toEqual({});
+  });
+
+  it('setForecastOverride adds day and range overrides; deleteOverride removes by range or all', () => {
+    const s = useGameStore.getState();
+    s.loadScenario(fixtureScenario);
+    s.setForecastOverride({ itemId: 'grain', depotId: 'camp', day: 2, qty: 30 });
+    s.setForecastOverride({ itemId: 'grain', depotId: 'camp', from: 3, to: 6, total: 100 });
+    s.setForecastOverride({ itemId: 'grain', depotId: 'camp', day: 2, qty: 35 }); // replaces day 2
+    expect(useGameStore.getState().game!.overrides).toEqual([
+      { itemId: 'grain', depotId: 'camp', from: 3, to: 6, mode: 'aggregate', value: 100 },
+      { itemId: 'grain', depotId: 'camp', from: 2, to: 2, mode: 'absolute', value: 35 },
+    ]);
+    s.deleteOverride({ itemId: 'grain', depotId: 'camp', from: 3, to: 6 });
+    expect(useGameStore.getState().game!.overrides).toHaveLength(1);
+    s.deleteOverride({ itemId: 'grain', depotId: 'camp' });
+    expect(useGameStore.getState().game!.overrides).toEqual([]);
+  });
+
+  it('endDay is a no-op once the game is lost', () => {
+    const s = useGameStore.getState();
+    s.loadScenario(fixtureScenario);
+    useGameStore.setState({ game: { ...useGameStore.getState().game!, status: 'lost' } });
+    s.endDay();
+    expect(useGameStore.getState().game!.today).toBe(0);
   });
 });
