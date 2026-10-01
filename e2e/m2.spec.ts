@@ -26,7 +26,8 @@ test('tutorial 1 on hard: market, forecast override, KPIs, letters', async ({ pa
   await expect(page.getByTestId('forecast-cell').nth(2)).toHaveValue('42');
 
   for (let day = 0; day < 3; day++) await page.getByTestId('end-day').click();
-  await expect(page.getByTestId('today')).toHaveText('3');
+  // Campaign day counts from takeover (day 1 on the first morning), so it is independent of the warm-up length.
+  await expect(page.getByTestId('campaign-day')).toHaveText('4');
 
   await page.getByTestId('nav-dispatch').click();
   const kpis = page.getByTestId('kpi-panel');

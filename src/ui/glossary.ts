@@ -36,7 +36,10 @@ export type TermKey =
   | 'onTimeRate'
   | 'actualLeadTime'
   | 'itemLocation'
-  | 'masterData';
+  | 'masterData'
+  | 'dc'
+  | 'transfer'
+  | 'dependentDemand';
 
 export interface GlossaryEntry {
   term: string;
@@ -232,6 +235,27 @@ export const GLOSSARY: Record<TermKey, GlossaryEntry> = {
     flavour: 'The rolls the clerks plan from.',
     plain:
       'The standing facts behind every proposal: which vendor supplies what, lead times, pack sizes, costs, order days and minimum fills. Wrong master data gives wrong proposals, however good the forecast.',
+  },
+  dc: {
+    term: 'DC — distribution centre',
+    flavour: 'The great storehouse behind the lines.',
+    plain:
+      'A depot that feeds no soldiers itself. It buys from outside vendors in bulk, holds stock cheaply, and ships to the front depots by transfer. Its stock is the front’s safety net.',
+    related: ['transfer', 'dependentDemand'],
+  },
+  transfer: {
+    term: 'Transfer',
+    flavour: 'Your own wagons, your own stores.',
+    plain:
+      'An order a front depot places on a DC rather than on a merchant. It ships from the DC’s stock, costs nothing against the budget (the silver was spent when the DC bought it), and runs on the lane’s own order days and lead time. If the DC is short, the depot gets less than it ordered.',
+    related: ['dc', 'dependentDemand'],
+  },
+  dependentDemand: {
+    term: 'Dependent demand',
+    flavour: 'The storehouse is only as hungry as the camps it feeds.',
+    plain:
+      'A DC’s demand is not soldiers eating: it is the transfer orders the front depots are planning to place on it. Its forecast is built from those planned orders, so a change at the front shows up at the DC straight away.',
+    related: ['dc', 'transfer', 'forecast'],
   },
   orderTrigger: {
     term: 'Order trigger',
