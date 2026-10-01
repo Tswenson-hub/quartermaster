@@ -41,3 +41,21 @@ describe('selectDecisionPreview', () => {
     expect(selectDecisionPreview(game, { 0: { decision: 'rejected' } }).orders).toEqual([]);
   });
 });
+
+describe('selectKpiSummary', () => {
+  it('computes service level, SWAPE and bias', async () => {
+    const { selectKpiSummary } = await import('../../src/store/selectors');
+    const game = engine.initGame(fixtureScenario);
+    const kpi = { spoiled: 0, holdingCost: 0, spend: 0, daysOfSupply: 3 };
+    game.kpis = [
+      { day: 0, demand: 10, fulfilled: 10, forecast: 12, absError: 2, ...kpi },
+      { day: 1, demand: 10, fulfilled: 5, forecast: 6, absError: 4, ...kpi, daysOfSupply: 1 },
+    ];
+    const s = selectKpiSummary(game);
+    expect(s.serviceLevel).toBe(0.75);
+    expect(s.swape).toBeCloseTo(0.3);
+    expect(s.bias).toBeCloseTo(-0.1);
+    expect(s.daysOfSupply).toBe(1);
+    expect(selectKpiSummary(game, 1).serviceLevel).toBe(0.5);
+  });
+});

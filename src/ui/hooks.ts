@@ -46,6 +46,7 @@ export function useGameActions() {
       clearOverride: s.clearOverride,
       endDay: s.endDay,
       newGame: s.newGame,
+      quitGame: s.quitGame,
     })),
   );
 }

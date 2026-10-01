@@ -2,6 +2,7 @@
 import type {
   Day,
   DepotId,
+  Difficulty,
   ForecastPoint,
   GameState,
   ItemId,
@@ -53,7 +54,7 @@ export interface DecisionPreview {
   orders: OpenOrder[];
   /** Total value of those orders, incl. surcharges. */
   spend: number;
-  /** Sum of vendor-minimum surcharges among them. */
+  /** @deprecated Always 0 once the engine drops the surcharge path (RELEX_RULES §4). */
   surcharges: number;
   /** Indices of accepted proposals the engine would drop (e.g. below vendor minimum with no surcharge). */
   dropped: number[];
@@ -81,4 +82,54 @@ export function selectDecisionPreview(game: GameState, decisions: Record<number,
     surcharges: orders.reduce((a, o) => a + (o.surcharge ?? 0), 0),
     dropped,
   };
+}
+
+export interface KpiSummary {
+  demand: number;
+  fulfilled: number;
+  /** fulfilled ÷ demand, 0–1; 1 when there has been no demand. */
+  serviceLevel: number;
+  /** Days of supply at the end of the last ticked day (on hand ÷ next day's forecast). */
+  daysOfSupply: number;
+  /** Units spoiled. */
+  spoiled: number;
+  /** Σ|actual − forecast| ÷ Σ actual (RELEX_RULES §10). 0 = perfect. */
+  swape: number;
+  /** (Σ forecast − Σ actual) ÷ Σ actual. Positive = over-forecasting, negative = under. */
+  bias: number;
+}
+
+/** KPIs over ticked days from `fromDay` (default: the whole game so far). */
+export function selectKpiSummary(game: GameState, fromDay: Day = 0): KpiSummary {
+  const ks = game.kpis.filter((k) => k.day >= fromDay);
+  const sum = (f: (k: (typeof ks)[number]) => number) => ks.reduce((a, k) => a + f(k), 0);
+  const demand = sum((k) => k.demand);
+  const fulfilled = sum((k) => k.fulfilled);
+  return {
+    demand,
+    fulfilled,
+    serviceLevel: demand === 0 ? 1 : fulfilled / demand,
+    daysOfSupply: ks.at(-1)?.daysOfSupply ?? 0,
+    spoiled: sum((k) => k.spoiled),
+    swape: demand === 0 ? 0 : sum((k) => k.absError) / demand,
+    bias: demand === 0 ? 0 : (sum((k) => k.forecast) - demand) / demand,
+  };
+}
+
+export interface DifficultyOption {
+  id: Difficulty;
+  label: string;
+  ticker: string;
+  budgetFactor: number;
+}
+
+/** Difficulty choices for the new-game screen (rules.difficulty). */
+export function selectDifficultyOptions(): DifficultyOption[] {
+  return (Object.keys(rules.difficulty) as Difficulty[]).map((id) => ({ id, ...rules.difficulty[id] }));
+}
+
+/** Where today's demand signal comes from, for display. */
+export function selectMarketInfo(game: GameState) {
+  const { ticker, source, synthetic, firstDate, lastDate } = game.market;
+  return { ticker, source, synthetic: !!synthetic, firstDate, lastDate };
 }
