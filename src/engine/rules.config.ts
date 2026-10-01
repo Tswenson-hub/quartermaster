@@ -63,11 +63,17 @@ export interface Rules {
     forecastDeviationPct: number;
   };
   /**
-   * Spoilage fallback when ItemLocation.lots is absent (lot-based FIFO spoilage is M2):
-   * stock beyond `shelfLifeDays` × baseline forecast cannot be sold in time under FIFO;
-   * 1/shelfLifeDays of that excess spoils each day.
+   * Perishables. 'lots': stock is tracked in FIFO lots (ItemLocation.lots; missing lots are
+   * treated as received today); a lot spoils at the end of its shelfLifeDays-th day on hand.
+   * 'cover-excess': no lots — stock beyond `shelfLifeDays` × baseline forecast cannot be sold
+   * in time under FIFO, and 1/shelfLifeDays of that excess spoils each day.
    */
-  spoilage: { mode: 'cover-excess' };
+  spoilage: { mode: 'lots' | 'cover-excess' };
+  /**
+   * Deliveries fail (on-time-in-full) with probability 1 − Vendor.reliability, drawn once per
+   * order on its due day. A failed order arrives lateDaysMin..lateDaysMax days late, in full.
+   */
+  delivery: { lateDaysMin: number; lateDaysMax: number };
 }
 
 /** Inverse standard normal approximation (Acklam) — good enough for service-level z. */
@@ -103,5 +109,6 @@ export const rules: Rules = {
   mustOrderMinOnePack: true,
   demand: { baseWindow: 28, noiseCv: 0.2 },
   exceptions: { forecastDeviationPct: 0.3 },
-  spoilage: { mode: 'cover-excess' },
+  spoilage: { mode: 'lots' },
+  delivery: { lateDaysMin: 1, lateDaysMax: 2 },
 };

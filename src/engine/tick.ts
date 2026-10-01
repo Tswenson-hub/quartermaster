@@ -3,7 +3,8 @@ import { nextOrderDayFrom } from './calendar';
 import { baselineFromHistory, forecastLocation } from './forecast';
 import { projectLocation } from './projection';
 import { generatePlanLines, roundToPack } from './replenishment';
-import { rngForDay } from './rng';
+import { addLot, consume, expire, lotsOf } from './lots';
+import { createRng, hashSeed, rngForDay } from './rng';
 import { rules as defaultRules, type Rules } from './rules.config';
 import type {
   Day,
@@ -122,8 +123,9 @@ export function refresh(state: GameState, r: Rules = defaultRules): GameState {
 /**
  * Turn accepted decisions into open orders placed today. Edited qty is rounded to the pack
  * size and cost recomputed; spend is committed to the current fiscal period. Rejected and
- * deferred lines are dropped. Proposals/exceptions are then refreshed (accepted lines are
- * now covered by open orders).
+ * deferred lines are dropped. A vendor order below the vendor minimum takes the surcharge
+ * or is dropped (see applyMinimumSurcharges). Proposals/exceptions are then refreshed
+ * (accepted lines are now covered by open orders).
  */
 export function placeOrders(state: GameState, decisions: ProposalDecisionInput[], r: Rules = defaultRules): GameState {
   const newOrders: OpenOrder[] = [];
@@ -148,12 +150,42 @@ export function placeOrders(state: GameState, decisions: ProposalDecisionInput[]
       cost: qty * source.unitCost,
     });
   }
-  if (newOrders.length === 0) return state;
+  const placed = applyMinimumSurcharges(state, newOrders);
+  if (placed.length === 0) return state;
 
-  const spend = newOrders.reduce((s, o) => s + o.cost, 0);
+  const spend = placed.reduce((s, o) => s + o.cost, 0);
   const period = periodFor(state.periods, state.today);
   const periods = state.periods.map((p) => (p === period ? { ...p, committed: p.committed + spend } : p));
-  return refresh({ ...state, openOrders: [...state.openOrders, ...newOrders], periods }, r);
+  return refresh({ ...state, openOrders: [...state.openOrders, ...placed], periods }, r);
+}
+
+/**
+ * Vendor minimums at acceptance (RELEX_RULES §6), per (vendor, depot) order placed today.
+ * A short order is accepted with the vendor's surcharge — added once, to the cost of the
+ * order's first line — or dropped if the vendor defines no surcharge. If lines for that
+ * vendor/depot were already placed today, the order already passed this check.
+ */
+function applyMinimumSurcharges(state: GameState, newOrders: OpenOrder[]): OpenOrder[] {
+  const groups = new Map<string, OpenOrder[]>();
+  for (const o of newOrders) {
+    const key = `${o.vendorId}\u0000${o.depotId}`;
+    groups.set(key, [...(groups.get(key) ?? []), o]);
+  }
+  const out: OpenOrder[] = [];
+  for (const group of groups.values()) {
+    const { vendorId, depotId } = group[0];
+    const min = state.vendors[vendorId]?.minimum;
+    const alreadyPlaced = state.openOrders.some(
+      (o) => o.orderedOn === state.today && o.vendorId === vendorId && o.depotId === depotId,
+    );
+    const total = group.reduce((s, o) => s + (min?.kind === 'value' ? o.cost : o.qty), 0);
+    if (!min || alreadyPlaced || total >= min.amount) {
+      out.push(...group);
+    } else if (min.surcharge !== undefined) {
+      out.push({ ...group[0], cost: group[0].cost + min.surcharge }, ...group.slice(1));
+    }
+  }
+  return out;
 }
 
 /**
@@ -170,11 +202,34 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
   const kpi = { day: t, demand: 0, fulfilled: 0, spoiled: 0, holdingCost: 0, spend: 0, forecast: 0 };
 
   for (const o of state.openOrders) if (o.orderedOn === t) kpi.spend += o.cost;
-  const openOrders = state.openOrders.filter((o) => o.deliveryOn > t);
+
+  // Deliveries due today fail on-time-in-full with probability 1 − reliability, once per
+  // order (an order already pushed back arrives). Separate stream from demand noise.
+  const deliveryRng = createRng(hashSeed(state.seed, t, 1));
+  const { lateDaysMin, lateDaysMax } = r.delivery;
+  const orders = state.openOrders.map((o) => {
+    if (o.deliveryOn !== t) return o;
+    const fail = deliveryRng.next();
+    const lateBy = lateDaysMin + Math.floor(deliveryRng.next() * (lateDaysMax - lateDaysMin + 1));
+    const vendor = state.vendors[o.vendorId];
+    if (!vendor || o.deliveryOn !== o.orderedOn + vendor.leadTimeDays || fail < vendor.reliability || lateBy <= 0) {
+      return o;
+    }
+    events.push({
+      kind: 'delivery-late',
+      day: t,
+      itemId: o.itemId,
+      depotId: o.depotId,
+      vendorId: o.vendorId,
+      message: `${vendor.name}'s carts are delayed: ${o.qty} ${state.items[o.itemId]?.unit ?? 'units'} now due day ${t + lateBy}.`,
+    });
+    return { ...o, deliveryOn: t + lateBy };
+  });
+  const openOrders = orders.filter((o) => o.deliveryOn > t);
 
   const locations = state.locations.map((loc) => {
     const item = state.items[loc.itemId];
-    const received = state.openOrders
+    const received = orders
       .filter((o) => o.deliveryOn <= t && o.itemId === loc.itemId && o.depotId === loc.depotId)
       .reduce((s, o) => s + o.qty, 0);
     let stock = loc.onHand + received;
@@ -187,13 +242,22 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
     const noise = rng.normal(); // always drawn, so the sequence doesn't depend on parameters
     const demand = Math.max(0, Math.round(rate * uplift * (1 + r.demand.noiseCv * noise)));
 
+    const useLots = item?.shelfLifeDays !== undefined && item.shelfLifeDays > 0 && r.spoilage.mode === 'lots';
+    let lots = useLots || loc.lots ? addLot(lotsOf(loc, t), received, t) : undefined;
+
     const fulfilled = Math.min(stock, demand);
     stock -= fulfilled;
+    if (lots) lots = consume(lots, fulfilled).lots;
     const short = demand - fulfilled;
     morale -= short * (item?.criticality ?? 1) * r.morale.perUnitStockoutByCriticality;
 
     let spoiled = 0;
-    if (item?.shelfLifeDays !== undefined && item.shelfLifeDays > 0) {
+    if (useLots && lots) {
+      const expired = expire(lots, t, item!.shelfLifeDays!);
+      lots = expired.lots;
+      spoiled = expired.spoiled;
+      stock -= spoiled;
+    } else if (item?.shelfLifeDays !== undefined && item.shelfLifeDays > 0) {
       const sellable = baselineFromHistory(loc.history, r) * item.shelfLifeDays;
       const excess = stock - sellable;
       if (excess > 0) spoiled = Math.min(stock, Math.ceil(excess / item.shelfLifeDays));
@@ -233,7 +297,9 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
     kpi.fulfilled += fulfilled;
     kpi.spoiled += spoiled;
     kpi.holdingCost += stock * (item?.holdingCost ?? 0);
-    return { ...loc, onHand: stock, history: [...loc.history, demand] };
+    const next: ItemLocation = { ...loc, onHand: stock, history: [...loc.history, demand] };
+    if (lots) next.lots = lots;
+    return next;
   });
 
   // Period close: overspend reduces next period's allowance and costs morale.

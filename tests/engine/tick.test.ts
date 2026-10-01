@@ -101,8 +101,8 @@ describe('tick (noise off)', () => {
     expect(s.kpis[0].holdingCost).toBeCloseTo(9, 10); // 90 × 0.1
   });
 
-  it('spoilage: stock beyond shelf life × baseline spoils at 1/shelfLife per day', () => {
-    const s = tick(state({ items: { grain: item('grain', { shelfLifeDays: 5 }) } }), q);
+  it("spoilage 'cover-excess': stock beyond shelf life × baseline spoils at 1/shelfLife per day", () => {
+    const s = tick(state({ items: { grain: item('grain', { shelfLifeDays: 5 }) } }), { ...q, spoilage: { mode: 'cover-excess' } });
     // 100 − 10 = 90; sellable 50; excess 40 → 8 spoil
     expect(s.locations[0].onHand).toBe(82);
     expect(s.kpis[0].spoiled).toBe(8);
