@@ -97,3 +97,19 @@ describe('gameStore', () => {
     expect(memory.has(SAVE_KEY)).toBe(false);
   });
 });
+
+describe('selectors', () => {
+  it('selectPlanningParams gives MOP and D2 on a non-order day', async () => {
+    const { selectPlanningParams } = await import('../../src/store');
+    const s = useGameStore.getState();
+    s.loadScenario(fixtureScenario);
+    s.endDay(); // day 1 = Tuesday, mill orders Mon/Thu
+    const game = useGameStore.getState().game!;
+    expect(game.proposals).toHaveLength(0);
+    const pp = selectPlanningParams(game, 'grain', 'camp')!;
+    expect(pp.orderDay).toBe(3);
+    expect(pp.d1).toBe(5);
+    expect(pp.d2).toBe(9); // next order Mon (7) + LT 2
+    expect(pp.mustOrderPoint).toBeGreaterThanOrEqual(5);
+  });
+});

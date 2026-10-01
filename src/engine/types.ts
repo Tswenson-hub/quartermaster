@@ -234,6 +234,23 @@ export interface ProposalDecisionInput {
   qty?: number;
 }
 
+/** Replenishment parameters for one item-location at its next order opportunity (today or later). */
+export interface PlanningParams {
+  itemId: ItemId;
+  depotId: DepotId;
+  /** Source vendor used for the next order opportunity. */
+  vendorId: VendorId;
+  /** Day of the next order opportunity (today if today is an order day). */
+  orderDay: Day;
+  d1: Day;
+  d2: Day;
+  safetyStock: number;
+  mustOrderPoint: number;
+  canOrderPoint: number;
+  orderUpTo: number;
+  projectedAtD2: number;
+}
+
 export interface EngineApi {
   /** Build day-0 state from a scenario: periods, empty kpis/exceptions, proposals + exceptions computed. */
   initGame(scenario: Scenario): GameState;
@@ -244,6 +261,11 @@ export interface EngineApi {
   refresh(state: GameState): GameState;
   /** Daily forecast for one item-location, inclusive day range. */
   forecast(state: GameState, itemId: ItemId, depotId: DepotId, from: Day, to: Day): ForecastPoint[];
+  /**
+   * MOP/COP/D1/D2 for one item-location, so the UI can draw them on days with no proposal.
+   * undefined if the item has no usable source.
+   */
+  planningParams(state: GameState, itemId: ItemId, depotId: DepotId): PlanningParams | undefined;
   /** Projected end-of-day stock for days from..to inclusive (index 0 = `from`), incl. open orders. */
   project(state: GameState, itemId: ItemId, depotId: DepotId, from: Day, to: Day): number[];
   /**
