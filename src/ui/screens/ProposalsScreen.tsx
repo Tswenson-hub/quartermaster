@@ -1,4 +1,5 @@
-import type { GameState, ProposalReason } from '../../engine/types';
+import { useState } from 'react';
+import type { GameState, ProposalReason, Vendor, VendorPlan } from '../../engine/types';
 import { ItemIcon, VendorTile } from '../components/ItemIcon';
 import { Meter } from '../components/Meter';
 import { Panel } from '../components/Panel';
@@ -19,8 +20,8 @@ export function ProposalsScreen() {
   const game = useGame();
   const groups = useVendorGroups();
   if (!game) return null;
-  const withLines = groups.filter((g) => g.lines.length);
-  const idle = groups.filter((g) => !g.lines.length);
+  const withLines = groups.filter((g) => g.lines.length || g.plan?.status === 'below-trigger');
+  const idle = groups.filter((g) => !withLines.includes(g));
 
   return (
     <div className="stack">
@@ -82,6 +83,7 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
         </>
       }
       actions={
+        lines.length > 0 && (
         <button
           type="button"
           className="btn btn-small"
@@ -89,20 +91,17 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
         >
           Accept all
         </button>
+        )
       }
     >
-      {min && (
+      {min && <OrderTrigger vendor={vendor} plan={group.plan} customTrigger={group.customTrigger} />}
+      {group.plan?.status === 'built' && <BuildBreakdown lines={lines} game={game} unit={min?.kind} />}
+      {min && lines.length > 0 && (
         <div className={`vendor-min ${met ? 'met' : 'short'}`}>
           <div className="vendor-min-label">
-            <Term k="vendorMin">Vendor minimum</Term>: {fmt(min.amount)}
-            {min.surcharge !== undefined && <span className="muted"> (or {fmtSilver(min.surcharge)} surcharge)</span>} —{' '}
+            Your order vs the <Term k="vendorMin">minimum</Term> of {fmt(min.amount)} —{' '}
             {met ? <strong>met ✓</strong> : <strong>short by {fmt(min.amount - accepted)}</strong>}
           </div>
-          {group.surcharge > 0 && (
-            <p className="vendor-min-warn">
-              Sent as it stands, {vendor.name} adds a surcharge of {fmtSilver(group.surcharge)}.
-            </p>
-          )}
           {group.droppedCount > 0 && (
             <p className="vendor-min-warn bad">
               {vendor.name} will not ride for so small an order: {group.droppedCount} accepted line
@@ -111,7 +110,7 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
           )}
           <Meter
             max={Math.max(min.amount * 1.25, open)}
-            marker={{ value: min.amount, label: `Minimum ${fmt(min.amount)}` }}
+            markers={[{ value: min.amount, label: `Minimum ${fmt(min.amount)}` }]}
             segments={[
               { value: accepted, className: met ? 'seg-good' : 'seg-accepted', label: `Accepted ${fmt(accepted)}` },
               { value: open - accepted, className: 'seg-pending', label: `Undecided ${fmt(open - accepted)}` },
@@ -126,6 +125,7 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
           />
         </div>
       )}
+      {lines.length > 0 && (
       <div className="table-scroll">
         <table className="proposal-table">
           <thead>
@@ -155,6 +155,7 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
           </tbody>
         </table>
       </div>
+      )}
     </Panel>
   );
 }
@@ -187,6 +188,11 @@ function ProposalRow({ line, game }: { line: ProposalLine; game: GameState }) {
       </td>
       <td data-label="Why">
         <span className={`pill ${reason.cls}`}>{reason.term ? <Term k={reason.term}>{reason.label}</Term> : reason.label}</span>
+        {!!p.builtQty && (
+          <div className="built-note">
+            <Term k="orderTrigger">+{fmtQty(p.builtQty)} built</Term>
+          </div>
+        )}
       </td>
       <td data-label="Proj. at D2" className={`num ${below ? 'bad-text' : ''}`}>{fmtQty(p.projectedAtD2)}</td>
       <td data-label="MOP / COP" className="num">
@@ -241,5 +247,148 @@ function ProposalRow({ line, game }: { line: ProposalLine; game: GameState }) {
         {line.dropped && <div className="dropped-note">will not ship: below minimum</div>}
       </td>
     </tr>
+  );
+}
+
+const pct = (f: number) => `${Math.round(f * 100)}%`;
+
+/** Order-trigger gauge + editor + status for a vendor with a minimum (RELEX_RULES §4, §6). */
+function OrderTrigger({ vendor, plan, customTrigger }: { vendor: Vendor; plan?: VendorPlan; customTrigger: boolean }) {
+  const { setVendorTrigger } = useGameActions();
+  const clearDrafts = useUiStore((s) => s.clearDrafts);
+  const trigger = plan?.trigger ?? vendor.orderTrigger ?? 1;
+  const [draft, setDraft] = useState(String(Math.round(trigger * 100)));
+  const min = vendor.minimum!;
+  const fmt = (n: number) => (min.kind === 'value' ? fmtSilver(n) : `${fmtQty(n)} units`);
+  const need = plan?.need ?? 0;
+  const ratio = plan?.ratio ?? 0;
+  const status = plan?.status;
+  const apply = (f: number | null) => {
+    setVendorTrigger(vendor.id, f);
+    clearDrafts();
+  };
+
+  return (
+    <div className={`trigger trigger-${status ?? 'none'}`} data-testid={`trigger-${vendor.id}`}>
+      <div className="trigger-head">
+        <div>
+          <strong>
+            <Term k="orderTrigger">Order trigger</Term>
+          </strong>{' '}
+          <span className="muted">
+            real need {fmt(need)} = <strong>{pct(ratio)}</strong> of the {fmt(min.amount)} minimum
+          </span>
+        </div>
+        <form
+          className="trigger-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const v = Number(draft);
+            if (Number.isFinite(v) && v >= 0) apply(v / 100);
+          }}
+        >
+          <label>
+            Trigger
+            <input
+              type="number"
+              min={0}
+              max={200}
+              step={5}
+              value={draft}
+              aria-label={`Order trigger for ${vendor.name}, percent of minimum`}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            %
+          </label>
+          <button type="submit" className="btn btn-small" disabled={Number(draft) === Math.round(trigger * 100)}>
+            Apply
+          </button>
+          {customTrigger && (
+            <button
+              type="button"
+              className="btn btn-small btn-ghost"
+              onClick={() => {
+                apply(null);
+                setDraft(String(Math.round((vendor.orderTrigger ?? trigger) * 100)));
+              }}
+            >
+              Default
+            </button>
+          )}
+        </form>
+      </div>
+      <Meter
+        max={min.amount * Math.max(1.25, ratio * 1.05, trigger * 1.1)}
+        markers={[
+          { value: trigger * min.amount, label: `Trigger ${pct(trigger)}`, className: 'marker-trigger' },
+          { value: min.amount, label: `Minimum ${fmt(min.amount)}` },
+        ]}
+        segments={[
+          {
+            value: need,
+            className: status === 'below-trigger' ? 'seg-short' : 'seg-accepted',
+            label: `Real need ${fmt(need)}`,
+          },
+        ]}
+        caption={
+          <>
+            <span className="legend-chip seg-accepted" /> real need {fmt(need)}
+            <span className="legend-chip marker marker-trigger" /> trigger {pct(trigger)}
+            <span className="legend-chip marker" /> minimum
+          </>
+        }
+      />
+      <p className="trigger-status">
+        {status === 'below-trigger' && (
+          <>
+            <strong>No order built.</strong> Real need is only {pct(ratio)} of the minimum, below your trigger of{' '}
+            {pct(trigger)}, so the clerk drafted nothing for {vendor.name}. Lower the trigger to let a small need build up
+            to a full order — or wait for the need to grow.
+          </>
+        )}
+        {status === 'built' && (
+          <>
+            <strong>Built to the minimum.</strong> Need reached {pct(ratio)}, past your {pct(trigger)} trigger, so the clerk
+            added one pack at a time of the neediest item (fewest days of cover at D2) until the minimum was met.
+          </>
+        )}
+        {status === 'meets-minimum' && <>Real need alone meets the minimum — nothing had to be built.</>}
+        {!status && <>No need for {vendor.name} today.</>}
+      </p>
+      <p className="muted small">Changing the trigger redrafts today’s proposals and clears decisions already made.</p>
+    </div>
+  );
+}
+
+/** Lines the trigger build added to reach the minimum (OrderProposal.builtQty). */
+function BuildBreakdown({ lines, game, unit }: { lines: ProposalLine[]; game: GameState; unit?: 'value' | 'units' }) {
+  const built = lines.filter((l) => (l.proposal.builtQty ?? 0) > 0);
+  if (!built.length) return null;
+  const total = built.reduce((a, l) => a + (unit === 'units' ? l.proposal.builtQty! : l.proposal.builtQty! * l.unitCost), 0);
+  return (
+    <div className="build-breakdown">
+      <div className="build-title">
+        Packs added to reach the minimum{' '}
+        <span className="muted">({unit === 'units' ? `${fmtQty(total)} units` : fmtSilver(total)} beyond real need)</span>
+      </div>
+      <ul className="plain-list">
+        {built.map((l) => {
+          const item = game.items[l.proposal.itemId];
+          const packs = Math.round(l.proposal.builtQty! / l.packSize);
+          return (
+            <li key={l.index} className="build-row">
+              <ItemIcon item={item} size={20} />
+              <span className="build-name">
+                {item?.name} <span className="muted">· {game.depots[l.proposal.depotId]?.name}</span>
+              </span>
+              <span>
+                +{packs} pack{packs === 1 ? '' : 's'} ({fmtQty(l.proposal.builtQty!)} {item?.unit}s)
+              </span>
+              <span className="num">{fmtSilver(l.proposal.builtQty! * l.unitCost)}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

@@ -4,19 +4,39 @@
 
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import type { Day, DepotId, FiscalPeriod, GameState, ItemId, OrderProposal, PlanningException, PlanningParams, ProposalDecision, Scenario, SourcingRule, Vendor } from '../engine/types';
+import type {
+  Day,
+  DepotId,
+  FiscalPeriod,
+  ForecastOverride,
+  GameState,
+  ItemId,
+  Letter,
+  OrderProposal,
+  PlanningException,
+  PlanningParams,
+  ProposalDecision,
+  Scenario,
+  SourcingRule,
+  Vendor,
+  VendorPlan,
+} from '../engine/types';
 import {
   isScenarioOver,
   selectCurrentPeriod,
   selectD2CheckDay,
   selectDecisionPreview,
+  selectDifficultyOptions,
   selectExceptionsToday,
   selectForecast,
+  selectKpiSummary,
+  selectMarketInfo,
   selectPlanningParams,
   selectProjection,
   selectServiceLevel,
   useGameStore,
 } from '../store';
+import * as content from '../content';
 import { scenarios } from '../content';
 import { useUiStore } from './uiStore';
 
@@ -37,19 +57,67 @@ export function useScenarioOver(): boolean {
   return useGameStore((s) => isScenarioOver(s.scenario, s.game));
 }
 
+/** True while a new game is fetching its market series. */
+export function useStarting(): boolean {
+  return useGameStore((s) => s.starting);
+}
+
 export function useGameActions() {
   return useGameStore(
     useShallow((s) => ({
       loadScenario: s.loadScenario,
-      decideProposal: s.decideProposal,
-      setOverride: s.setOverride,
-      clearOverride: s.clearOverride,
-      endDay: s.endDay,
       newGame: s.newGame,
       quitGame: s.quitGame,
+      decideProposal: s.decideProposal,
+      setVendorTrigger: s.setVendorTrigger,
+      setForecastOverride: s.setForecastOverride,
+      deleteOverride: s.deleteOverride,
+      endDay: s.endDay,
     })),
   );
 }
+
+export { getApiKey, setApiKey } from '../store';
+
+export function useDifficultyOptions() {
+  return useMemo(() => selectDifficultyOptions(), []);
+}
+
+export function useMarketInfo() {
+  const game = useGame();
+  return useMemo(() => (game ? selectMarketInfo(game) : null), [game]);
+}
+
+// ---------------------------------------------------------------- rank & letters
+
+// Content adds RANK_TITLES (lowest rank first); fall back to "Rank N" until it lands.
+const rankTitles = (content as unknown as { RANK_TITLES?: readonly string[] }).RANK_TITLES ?? [];
+
+export function rankTitle(level: number): string {
+  return rankTitles[level] ?? `Rank ${level + 1}`;
+}
+
+export function useRank() {
+  const game = useGame();
+  return useMemo(() => {
+    if (!game) return null;
+    const { level, merit, reprimands, overspentStreak } = game.rank;
+    return {
+      level,
+      merit,
+      reprimands,
+      overspentStreak,
+      title: rankTitle(level),
+      /** Highest level with a title (for drawing pips); at least the current level. */
+      maxLevel: Math.max(level, rankTitles.length - 1),
+    };
+  }, [game]);
+}
+
+export function useLetters(): Letter[] {
+  return useGame()?.letters ?? EMPTY_LETTERS;
+}
+const EMPTY_LETTERS: Letter[] = [];
 
 // ---------------------------------------------------------------- item planning
 
@@ -59,6 +127,10 @@ export interface PlanningPoint {
   history?: number;
   /** Final forecast (incl. battle-plan uplift / overrides). */
   forecast: number;
+  /** Engine baseline + uplift before any override (what the clerk would forecast). */
+  system: number;
+  /** A player override sets this day's forecast. */
+  overridden: boolean;
   /** Projected end-of-day stock (today onward). */
   projected?: number;
 }
@@ -75,6 +147,8 @@ export interface PlanningView {
   d2CheckDay?: Day;
   /** Today's proposal for this item-location, if any (carries D1/D2). */
   proposal?: OrderProposal;
+  /** Player forecast overrides for this item-location. */
+  overrides: ForecastOverride[];
 }
 
 export function usePlanningView(itemId: ItemId, depotId: DepotId, pastDays = 21, futureDays = 21): PlanningView | null {
@@ -90,6 +164,8 @@ export function usePlanningView(itemId: ItemId, depotId: DepotId, pastDays = 21,
     const points: PlanningPoint[] = fc.map((f) => ({
       day: f.day,
       forecast: f.total,
+      system: f.baseline + f.eventUplift,
+      overridden: f.override !== undefined,
       // history's last entry is yesterday
       history: f.day < game.today ? loc.history[loc.history.length - (game.today - f.day)] : undefined,
       projected: f.day >= game.today ? proj[f.day - game.today] : undefined,
@@ -105,6 +181,7 @@ export function usePlanningView(itemId: ItemId, depotId: DepotId, pastDays = 21,
       params,
       d2CheckDay: params ? selectD2CheckDay(params) : undefined,
       proposal,
+      overrides: game.overrides.filter((o) => o.itemId === itemId && o.depotId === depotId),
     };
   }, [game, itemId, depotId, pastDays, futureDays]);
 }
@@ -122,7 +199,7 @@ export interface ProposalLine {
   packSize: number;
   /** Display cost at `qty` (engine re-prices on accept). */
   cost: number;
-  /** Accepted, but the engine would not ship it (e.g. below vendor minimum, no surcharge). */
+  /** Accepted, but the engine would not ship it (e.g. order fell below the vendor minimum). */
   dropped: boolean;
 }
 
@@ -134,10 +211,12 @@ export interface VendorGroup {
   /** Accepted + undecided lines. */
   openValue: number;
   openUnits: number;
-  /** Vendor-minimum surcharge the engine would add if the day ended now. */
-  surcharge: number;
   /** Accepted lines the engine would drop (won't ship). */
   droppedCount: number;
+  /** Today's order-trigger result for this vendor (RELEX_RULES §4, §6). */
+  plan?: VendorPlan;
+  /** The player has set this vendor's trigger (vs. the default). */
+  customTrigger: boolean;
 }
 
 /** What ending the day would order — the engine's own placeOrders on today's decisions. */
@@ -161,7 +240,17 @@ export function useVendorGroups(): VendorGroup[] {
     const dropped = new Set(preview?.dropped ?? []);
     const byVendor = new Map<string, VendorGroup>();
     for (const v of Object.values(game.vendors)) {
-      byVendor.set(v.id, { vendor: v, lines: [], acceptedValue: 0, acceptedUnits: 0, openValue: 0, openUnits: 0, surcharge: 0, droppedCount: 0 });
+      byVendor.set(v.id, {
+        vendor: v,
+        lines: [],
+        acceptedValue: 0,
+        acceptedUnits: 0,
+        openValue: 0,
+        openUnits: 0,
+        droppedCount: 0,
+        plan: game.vendorPlans.find((vp) => vp.vendorId === v.id),
+        customTrigger: game.vendorTriggers[v.id] !== undefined,
+      });
     }
     game.proposals.forEach((p, index) => {
       const g = byVendor.get(p.vendorId);
@@ -192,10 +281,6 @@ export function useVendorGroups(): VendorGroup[] {
         g.openUnits += qty;
       }
     });
-    for (const o of preview?.orders ?? []) {
-      const g = byVendor.get(o.vendorId);
-      if (g) g.surcharge += o.surcharge ?? 0;
-    }
     return [...byVendor.values()].sort((a, b) => b.lines.length - a.lines.length);
   }, [game, decisions, drafts, preview]);
 }
@@ -205,7 +290,7 @@ export function useVendorGroups(): VendorGroup[] {
 export interface TreasuryView {
   period: FiscalPeriod | undefined;
   periods: FiscalPeriod[];
-  /** What ending the day now would spend (engine preview, incl. surcharges, excl. dropped lines). */
+  /** What ending the day now would spend (engine preview, excl. dropped lines). */
   pendingToday: number;
   remaining: number;
 }
@@ -233,4 +318,9 @@ export function useExceptionsToday(): PlanningException[] {
 export function useServiceLevel(): number {
   const game = useGame();
   return useMemo(() => (game ? Math.round(selectServiceLevel(game) * 1000) / 10 : 100), [game]);
+}
+
+export function useKpiSummary(lastDays?: number) {
+  const game = useGame();
+  return useMemo(() => (game ? selectKpiSummary(game, lastDays) : null), [game, lastDays]);
 }

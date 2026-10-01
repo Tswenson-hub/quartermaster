@@ -29,7 +29,7 @@ export function TreasuryScreen() {
             </div>
             <Meter
               max={Math.max(p.allowance, p.committed + t.pendingToday) * 1.05}
-              marker={{ value: p.allowance, label: `Allowance ${fmtSilver(p.allowance)}` }}
+              markers={[{ value: p.allowance, label: `Allowance ${fmtSilver(p.allowance)}` }]}
               segments={[
                 { value: p.committed, className: 'seg-accepted', label: `Committed ${fmtSilver(p.committed)}` },
                 { value: t.pendingToday, className: 'seg-pending', label: `Accepted today ${fmtSilver(t.pendingToday)}` },
@@ -96,7 +96,6 @@ export function TreasuryScreen() {
                       <td className="num">{fmtQty(o.qty)}</td>
                       <td className="num">
                         {fmtSilver(o.cost)}
-                        {!!o.surcharge && <div className="muted small">incl. {fmtSilver(o.surcharge)} surcharge</div>}
                       </td>
                     </tr>
                   ))}
