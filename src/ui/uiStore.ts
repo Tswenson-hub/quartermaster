@@ -4,7 +4,8 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { BattlePlanId, DepotId, ItemId } from '../engine/types';
 
-export type Screen = 'dispatch' | 'planning' | 'proposals' | 'battle' | 'letters' | 'treasury';
+export type Screen = 'dispatch' | 'planning' | 'proposals' | 'battle' | 'letters' | 'treasury' | 'masterdata';
+export type MasterTab = 'items' | 'vendors';
 
 interface UiState {
   screen: Screen;
@@ -19,6 +20,8 @@ interface UiState {
   draftQty: Record<number, number>;
   /** After the campaign ends, the player chose to look around instead of the end panel. */
   reviewingEnd: boolean;
+  /** Which roll the Master Data screen shows. */
+  masterTab: MasterTab;
   go: (screen: Screen) => void;
   planItem: (itemId: ItemId, depotId: DepotId) => void;
   openLetter: (id: BattlePlanId) => void;
@@ -27,6 +30,7 @@ interface UiState {
   setDraftQty: (index: number, qty: number | null) => void;
   clearDrafts: () => void;
   reviewEnd: () => void;
+  setMasterTab: (tab: MasterTab) => void;
   /** Forget everything tied to the current campaign. */
   resetCampaign: () => void;
 }
@@ -39,6 +43,7 @@ const campaignDefaults = {
   seenBattles: {},
   draftQty: {},
   reviewingEnd: false,
+  masterTab: 'items' as MasterTab,
 };
 
 export const useUiStore = create<UiState>()(
@@ -59,6 +64,7 @@ export const useUiStore = create<UiState>()(
         }),
       clearDrafts: () => set({ draftQty: {} }),
       reviewEnd: () => set({ reviewingEnd: true }),
+      setMasterTab: (masterTab) => set({ masterTab }),
       resetCampaign: () => set(campaignDefaults),
     }),
     {

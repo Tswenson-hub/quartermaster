@@ -8,6 +8,7 @@ const TABS: { id: Screen; label: string; flavour: string; colour: string }[] = [
   { id: 'battle', label: 'Battle Plans', flavour: 'Sealed letters', colour: '#7a4fa0' },
   { id: 'letters', label: 'Letters', flavour: 'From command', colour: '#5a4630' },
   { id: 'treasury', label: 'Treasury', flavour: 'The war chest', colour: '#4f7d3a' },
+  { id: 'masterdata', label: 'Master Data', flavour: 'The quartermaster’s rolls', colour: '#6b6f78' },
 ];
 
 export function NavRail() {

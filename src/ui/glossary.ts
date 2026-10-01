@@ -30,7 +30,13 @@ export type TermKey =
   | 'swape'
   | 'bias'
   | 'market'
-  | 'rank';
+  | 'rank'
+  | 'reviewPeriod'
+  | 'avgDailySales'
+  | 'onTimeRate'
+  | 'actualLeadTime'
+  | 'itemLocation'
+  | 'masterData';
 
 export interface GlossaryEntry {
   term: string;
@@ -187,6 +193,39 @@ export const GLOSSARY: Record<TermKey, GlossaryEntry> = {
     flavour: 'Your standing with the Lord Marshal.',
     plain:
       'Keep within budget and keep the army supplied to earn commendations and promotion. Repeated overspending earns letters of reprimand, then demotion. Losing a battle for want of supplies also costs rank. Fall below the lowest rank and you are dismissed.',
+  },
+  reviewPeriod: {
+    term: 'Review period',
+    flavour: 'Days between one chance to send for wagons and the next.',
+    plain:
+      'The gap between two order days with a supplier. Each order must carry you through it, so a longer review period means more safety stock and a higher MOP. Ordering every day shortens it to one day.',
+  },
+  avgDailySales: {
+    term: 'Average daily sales',
+    flavour: 'What the camp actually ate and loosed, day by day.',
+    plain: 'Mean actual demand per day over the last 28 days of history. Compare it with the forecast to see whether the forecast is running high or low.',
+  },
+  onTimeRate: {
+    term: 'On-time rate',
+    flavour: 'How often the wagon came when promised.',
+    plain: 'Deliveries received on or before their promised day ÷ all deliveries received. A low rate means you need more safety stock or a more reliable supplier.',
+  },
+  actualLeadTime: {
+    term: 'Actual vs promised lead time',
+    flavour: 'Days the road really took, against the days the merchant swore to.',
+    plain: 'Mean days from order to receipt over delivered orders, next to the lead time the vendor promises. Planning uses the promised lead time, so a gap here becomes stockouts.',
+  },
+  itemLocation: {
+    term: 'Item-location',
+    flavour: 'One store in one camp.',
+    plain:
+      'One item at one depot: the unit that is forecast and replenished. Grain at the Eastern Camp and grain at the siege lines are two item-locations, each with its own stock, forecast and MOP.',
+  },
+  masterData: {
+    term: 'Master data',
+    flavour: 'The rolls the clerks plan from.',
+    plain:
+      'The standing facts behind every proposal: which vendor supplies what, lead times, pack sizes, costs, order days and minimum fills. Wrong master data gives wrong proposals, however good the forecast.',
   },
   orderTrigger: {
     term: 'Order trigger',

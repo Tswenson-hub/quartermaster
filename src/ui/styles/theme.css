@@ -1424,6 +1424,63 @@ input.edited {
   padding-top: 18px;
 }
 
+/* ------------------------------------------------------------------ master data */
+.master-count {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+.master-hint {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 8px;
+}
+.master-table td,
+.master-table th {
+  white-space: nowrap;
+}
+.sort-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sort-arrow {
+  font-size: 12px;
+  color: var(--muted);
+}
+th[aria-sort='ascending'] .sort-arrow,
+th[aria-sort='descending'] .sort-arrow {
+  color: var(--ink);
+}
+tr.clickable {
+  cursor: pointer;
+}
+tr.clickable:hover td,
+tr.clickable:focus-visible td {
+  background: var(--parchment-hi);
+}
+tr.clickable:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: -3px;
+}
+.order-days-cell select {
+  margin-top: 4px;
+  max-width: 220px;
+}
+.your-schedule {
+  color: var(--royal);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 /* ------------------------------------------------------------------ new game */
 .difficulty-list {
   display: grid;
@@ -1922,30 +1979,37 @@ input.edited {
 }
 
 @media (max-width: 900px) {
-  /* proposal rows become cards */
-  .proposal-table thead {
+  /* proposal and master-data rows become cards */
+  .proposal-table thead,
+  .card-table thead {
     display: none;
   }
   .proposal-table,
-  .proposal-table tbody {
+  .proposal-table tbody,
+  .card-table,
+  .card-table tbody {
     display: block;
   }
-  .proposal-table tr {
+  .proposal-table tr,
+  .card-table tr {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 6px 12px;
     padding: 10px 0;
     border-bottom: 2px dashed var(--parchment-edge);
   }
-  .proposal-table td {
+  .proposal-table td,
+  .card-table td {
     border: 0;
     padding: 0;
     text-align: left;
   }
-  .proposal-table td.cell-item {
+  .proposal-table td.cell-item,
+  .card-table td.cell-item {
     grid-column: 1 / -1;
   }
-  .proposal-table td[data-label]::before {
+  .proposal-table td[data-label]::before,
+  .card-table td[data-label]::before {
     content: attr(data-label);
     display: block;
     font-size: 12px;

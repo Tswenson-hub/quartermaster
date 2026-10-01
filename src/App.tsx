@@ -13,6 +13,7 @@ import { useUiStore } from './ui/uiStore';
 
 // Chart screens pull in Recharts; load them on demand to keep the first chunk small.
 const PlanningScreen = lazy(() => import('./ui/screens/PlanningScreen').then((m) => ({ default: m.PlanningScreen })));
+const MasterDataScreen = lazy(() => import('./ui/screens/MasterDataScreen').then((m) => ({ default: m.MasterDataScreen })));
 const TreasuryScreen = lazy(() => import('./ui/screens/TreasuryScreen').then((m) => ({ default: m.TreasuryScreen })));
 
 const SCREENS = {
@@ -22,6 +23,7 @@ const SCREENS = {
   battle: BattlePlansScreen,
   letters: LettersScreen,
   treasury: TreasuryScreen,
+  masterdata: MasterDataScreen,
 };
 
 export default function App() {

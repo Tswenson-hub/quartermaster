@@ -20,6 +20,11 @@ import type {
   SourcingRule,
   Vendor,
   VendorPlan,
+  Weekday,
+  Item,
+  Depot,
+  ItemLocationStats,
+  VendorStats,
 } from '../engine/types';
 import {
   isScenarioOver,
@@ -29,6 +34,9 @@ import {
   selectDifficultyOptions,
   selectExceptionsToday,
   selectForecast,
+  selectItemLocationRows,
+  selectVendorOrderDays,
+  selectVendorRows,
   selectKpiSummary,
   selectLetterText,
   selectMarketInfo,
@@ -71,6 +79,7 @@ export function useGameActions() {
       quitGame: s.quitGame,
       decideProposal: s.decideProposal,
       setVendorTrigger: s.setVendorTrigger,
+      setVendorOrderDays: s.setVendorOrderDays,
       setForecastOverride: s.setForecastOverride,
       deleteOverride: s.deleteOverride,
       endDay: s.endDay,
@@ -220,6 +229,10 @@ export interface VendorGroup {
   plan?: VendorPlan;
   /** The player has set this vendor's trigger (vs. the default). */
   customTrigger: boolean;
+  /** Order weekdays in effect, after the player's schedule override. */
+  orderDays: Weekday[];
+  /** The player has overridden this vendor's order days. */
+  customSchedule: boolean;
 }
 
 /** What ending the day would order — the engine's own placeOrders on today's decisions. */
@@ -253,6 +266,8 @@ export function useVendorGroups(): VendorGroup[] {
         droppedCount: 0,
         plan: game.vendorPlans.find((vp) => vp.vendorId === v.id),
         customTrigger: game.vendorTriggers[v.id] !== undefined,
+        orderDays: selectVendorOrderDays(game, v.id),
+        customSchedule: game.vendorOrderDays[v.id] !== undefined,
       });
     }
     game.proposals.forEach((p, index) => {
@@ -326,4 +341,44 @@ export function useServiceLevel(): number {
 export function useKpiSummary(lastDays?: number) {
   const game = useGame();
   return useMemo(() => (game ? selectKpiSummary(game, lastDays) : null), [game, lastDays]);
+}
+
+// ---------------------------------------------------------------- master data
+
+export interface ItemLocationRow {
+  stats: ItemLocationStats;
+  item?: Item;
+  depot?: Depot;
+  vendor?: Vendor;
+}
+
+/** Master Data item-location rows (engine-computed), joined with display records. */
+export function useItemLocationRows(): ItemLocationRow[] {
+  const game = useGame();
+  return useMemo(
+    () =>
+      game
+        ? selectItemLocationRows(game).map((stats) => ({
+            stats,
+            item: game.items[stats.itemId],
+            depot: game.depots[stats.depotId],
+            vendor: stats.vendorId ? game.vendors[stats.vendorId] : undefined,
+          }))
+        : [],
+    [game],
+  );
+}
+
+export interface VendorRow {
+  stats: VendorStats;
+  vendor?: Vendor;
+}
+
+/** Master Data vendor rows (master data + performance), joined with the vendor record. */
+export function useVendorRows(): VendorRow[] {
+  const game = useGame();
+  return useMemo(
+    () => (game ? selectVendorRows(game).map((stats) => ({ stats, vendor: game.vendors[stats.vendorId] })) : []),
+    [game],
+  );
 }

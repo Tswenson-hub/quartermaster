@@ -5,7 +5,7 @@ import { Meter } from '../components/Meter';
 import { Panel } from '../components/Panel';
 import { Term } from '../components/Term';
 import type { TermKey } from '../glossary';
-import { fmtDay, fmtQty, fmtSilver, weekdayName } from '../format';
+import { fmtDay, fmtOrderDays, fmtQty, fmtSilver } from '../format';
 import { useGame, useGameActions, useVendorGroups, type ProposalLine, type VendorGroup } from '../hooks';
 import { useUiStore } from '../uiStore';
 
@@ -46,7 +46,8 @@ export function ProposalsScreen() {
                 <VendorTile id={g.vendor.id} name={g.vendor.name} size={24} />
                 <span>{g.vendor.name}</span>
                 <span className="muted">
-                  <Term k="orderDay">orders</Term> {g.vendor.orderDays.map((d) => weekdayName(d)).join('/')} ·{' '}
+                  <Term k="orderDay">orders</Term> {fmtOrderDays(g.orderDays)}
+                  {g.customSchedule && <span className="your-schedule"> (your schedule)</span>} ·{' '}
                   <Term k="leadTime">lead time</Term> {g.vendor.leadTimeDays}d
                 </span>
               </li>
@@ -78,7 +79,8 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
       }
       flavour={
         <>
-          <Term k="orderDay">Orders</Term> {vendor.orderDays.map((d) => weekdayName(d)).join('/')} ·{' '}
+          <Term k="orderDay">Orders</Term> {fmtOrderDays(group.orderDays)}
+          {group.customSchedule && <span className="your-schedule"> (your schedule)</span>} ·{' '}
           <Term k="leadTime">lead time</Term> {vendor.leadTimeDays} days · reliability {Math.round(vendor.reliability * 100)}%
         </>
       }
