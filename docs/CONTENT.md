@@ -22,15 +22,20 @@ produces the same numbers.
   `history[i]` falls on weekday `i % 7`, and day 0 is Monday. Slow movers (mean < 3/day) use
   Poisson demand. Faster ones use Gaussian noise with the item's coefficient of variation.
 - **Vendor `reliability`** is the chance that a delivery arrives on time and in full (1 = never
-  fails). The comment in `types.ts` says "probability of delay/short-ship". The field name says the
-  opposite, so the lead should settle which one is meant. The content is authored as on-time
-  probability: river 0.75, smithy 0.8, armory 0.99.
+  fails), as the contract now states.
+- **Vendor `minimum.surcharge`** is a flat silver fee for accepting an order below the minimum:
+  fletchers 15, smithy 40, armory 60.
 - **Split shares** are re-normalised per scenario over the vendors present. If only one source
   remains, `splitShare` is dropped.
 - **Opening stock** is `mean × onHandDays`, capped at half the shelf life for perishables.
 - **Period allowance** is the expected base spend at the cheapest source × the period length × a
-  per-level factor: 1.5 in early levels, falling to 1.05 in level VII. Battle-plan uplift is not
-  included, so letters create budget pressure.
+  per-level factor (1.5 in levels I–II, 1.1–1.3 after that, 1.35 in the sandbox). Battle-plan
+  uplift is not included, so letters create budget pressure. A final period cut short by the
+  scenario end gets a pro-rated allowance.
+- **Balance targets** (accept every proposal, checked against the real engine): service ≥ 95% on
+  every level; levels I–VI use about 50–80% of the allowance; the sandbox uses 76–96% per period.
+  Level VII goes over on purpose: about 7% in period 1 and 37% in period 2. Most of the period-2
+  overspend comes from the post-assault forecast (see the engine note below).
 
 ## Items
 
@@ -56,11 +61,11 @@ produces the same numbers.
 | id | Name | Order days | LT | Minimum | Reliability |
 |---|---|---|---|---|---|
 | abbey-granary | St. Aldric's Abbey Granary | Mon, Thu | 3 | — | 0.95 |
-| guild-fletchers | Worshipful Guild of Fletchers | Tue | 5 | 120 units | 0.90 |
-| mountain-smithy | Ironhollow Mountain Smithy | Wed | 7 | 250 silver | 0.80 |
+| guild-fletchers | Worshipful Guild of Fletchers | Tue | 5 | 120 units (+15 surcharge) | 0.90 |
+| mountain-smithy | Ironhollow Mountain Smithy | Wed | 7 | 250 silver (+40 surcharge) | 0.80 |
 | river-merchants | Merchants of the Silverwash | Mon, Wed, Fri | 2 | — | 0.75 |
 | apothecary | Brother Fennick's Apothecary | Mon–Sat | 1 | — | 0.97 |
-| royal-armory | Royal Armory of Kingsreach | Fri | 4 | 400 silver | 0.99 |
+| royal-armory | Royal Armory of Kingsreach | Fri | 4 | 400 silver (+60 surcharge) | 0.99 |
 
 ## Multi-sourcing
 
@@ -91,7 +96,7 @@ produces the same numbers.
 | IV | tutorial-4 | pack size, rounding, shelf life, spoilage | ale (pack 12, 10-day life), salt pork, hardtack @ eastern-camp | abbey, river | 28 |
 | V | tutorial-5 | vendor minimums, COP, must vs can | arrows, bowstrings (fletchers, units min); horseshoes, mail rings (smithy, value min) @ northern-pass | fletchers, smithy | 28 |
 | VI | tutorial-6 | multi-sourcing: priority, split, reliability | grain, oats, arrows @ eastern-camp | abbey, river, fletchers, armory | 35 |
-| VII | tutorial-7 | battle plans, uplift trust, budget pressure | arrows, pitch, rope, bandages, grain @ harrowmere; grain, ale @ eastern-camp | 5 vendors | 56 |
+| VII | tutorial-7 | battle plans, uplift trust, budget pressure | arrows (guild only), pitch, rope, bandages, grain @ harrowmere; grain, ale @ eastern-camp | 5 vendors | 56 |
 | — | sandbox | everything | all 14 items × 3 depots (38 locations) | all 6 | 112 |
 
 In level V, typical weekly volume is under each vendor's minimum: fletchers about 70 units against
@@ -154,3 +159,14 @@ Also useful from the same pack, as UI icons:
 
 Put the raw downloads in `assets/_raw/` (gitignored). Copy only the chosen files into
 `public/assets/` and list them in `manifest.json`.
+
+## Engine notes found while balancing (for lead/engine)
+
+- **Event demand inflates the baseline.** After the Harrowmere assault (days 21–27), the 14-day
+  moving average still contains the boosted demand. The engine then orders about 1.8× normal
+  arrows in the following period. RELEX cleans event days out of history before computing the
+  baseline (for example, by dividing those days by the actual uplift).
+- **Priority fallback orders every week.** For a priority-sourced item, each vendor's order day
+  picks "best vendor ordering today", so the fallback vendor (e.g. armory on Fridays) also gets
+  weekly orders. Its large packs (arrows, 50) then overstock the depot.
+- **`splitShare` is not applied yet.** Oats and bolts are currently sourced by priority/order day.

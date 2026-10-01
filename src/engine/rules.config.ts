@@ -63,7 +63,7 @@ export interface Rules {
     forecastDeviationPct: number;
   };
   /**
-   * Spoilage approximation until lots are tracked (see docs/contract-requests.md):
+   * Spoilage fallback when ItemLocation.lots is absent (lot-based FIFO spoilage is M2):
    * stock beyond `shelfLifeDays` × baseline forecast cannot be sold in time under FIFO;
    * 1/shelfLifeDays of that excess spoils each day.
    */

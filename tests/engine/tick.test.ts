@@ -52,7 +52,7 @@ describe('tick (noise off)', () => {
     expect(s.today).toBe(4);
     expect(s.openOrders).toEqual([]);
     expect(s.locations[0].history).toEqual(flat(10, 18));
-    expect(s.kpis[0]).toEqual({ day: 0, demand: 10, fulfilled: 10, spoiled: 0, holdingCost: 0, spend: 60 });
+    expect(s.kpis[0]).toEqual({ day: 0, demand: 10, fulfilled: 10, spoiled: 0, holdingCost: 0, spend: 60, forecast: 10 });
     expect(s.kpis.map((k) => k.spend)).toEqual([60, 0, 0, 0]);
   });
 
@@ -68,6 +68,28 @@ describe('tick (noise off)', () => {
     expect(s.kpis[0]).toMatchObject({ demand: 10, fulfilled: 5 });
     expect(s.locations[0].onHand).toBe(0);
     expect(s.morale).toBeCloseTo(80 - 0.75 + 0.5, 10);
+    expect(s.exceptions).toContainEqual(expect.objectContaining({ kind: 'stockout', day: 0, itemId: 'grain', depotId: 'camp' }));
+    // Survives a refresh (e.g. the player edits an override the next morning).
+    expect(refresh(s, q).exceptions.some((e) => e.kind === 'stockout')).toBe(true);
+  });
+
+  it('no stockout exception when demand is met', () => {
+    expect(tick(state(), q).exceptions.some((e) => e.kind === 'stockout')).toBe(false);
+  });
+
+  it('KPI forecast sums the morning forecast over locations (stated uplift, not actual)', () => {
+    const s = tick(
+      state({
+        items: { grain: item('grain'), salt: item('salt') },
+        sourcing: [source('grain'), source('salt')],
+        locations: [loc('grain'), loc('salt', { history: flat(4) })],
+        battlePlans: [
+          { id: 'b', title: '', letter: '', announcedOn: 0, start: 0, end: 0, depotIds: ['camp'], statedUplift: { grain: 1.5 }, actualUplift: { grain: 2 } },
+        ],
+      }),
+      q,
+    );
+    expect(s.kpis[0]).toMatchObject({ forecast: 19, demand: 24 }); // 15 + 4 vs 20 + 4
   });
 
   it('morale recovers but caps at 100', () => {
