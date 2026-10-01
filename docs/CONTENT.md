@@ -29,6 +29,15 @@ produces the same numbers.
   fires the smithy trigger, so the player has to lower it. There are no surcharges any more.
 - **`minimumFill`** is the player's floor. MOP = max(safety stock, minimumFill). It is set where the
   lesson needs it: level III grain (30, above safety stock) and level IX Harrowmere bandages (20).
+- **Warm start:** the previous quartermaster plays `warmupDays` (default 14; tutorial-1 uses 7),
+  accepting every proposal. The player then takes over on a Monday. Battle-plan days are written
+  relative to takeover, and the history seeding is unchanged.
+- **Distribution centre:** `kingsreach-dc` (kind `dc`). For each DC item, a front depot with a
+  lane in the scenario buys only from its lane, through a rule scoped with `depotIds: [front]`.
+  The DC and any front depot without a lane buy from the outside vendors. Lane rules use the
+  cheapest vendor cost (valuation only; transfers don't touch the budget) and the smallest vendor
+  pack. DC locations have no history (their demand is dependent), service level 0.95, minimum
+  fill = 3 days and opening stock = 7–8 days of the served depots' combined demand.
 - **Split shares** are re-normalised per scenario over the vendors present. If only one source
   remains, `splitShare` is dropped.
 - **Opening stock** is `mean × onHandDays`, capped at half the shelf life for perishables.
@@ -39,6 +48,9 @@ produces the same numbers.
   gets a pro-rated allowance.
 
 ## Balance (market-driven demand, synthetic KO/AAPL/TSLA snapshots)
+
+> Measured before warm start, DC transfers and the 3-day minimum lead time. To be re-run once the
+> engine's DC support lands.
 
 Checked against the real engine with two strategies. **Accept-all** accepts every proposal.
 **Careful** also judges each letter correctly (stated uplift = actual uplift). Levels that teach
@@ -80,8 +92,14 @@ with statedUplift = actualUplift, as the lead's tests do. Battle thresholds come
 | abbey-granary | St. Aldric's Abbey Granary | Mon, Thu | 3 | — | 0.95 |
 | guild-fletchers | Worshipful Guild of Fletchers | Tue | 5 | 120 units, trigger 0.5 | 0.90 |
 | mountain-smithy | Ironhollow Mountain Smithy | Wed | 7 | 250 silver, trigger **0.8** | 0.80 |
-| river-merchants | Merchants of the Silverwash | Mon, Wed, Fri | 2 | — | 0.75 |
-| apothecary | Brother Fennick's Apothecary | Mon–Sat | 1 | — | 0.97 |
+| river-merchants | Merchants of the Silverwash | Mon, Wed, Fri | 3 | — | 0.75 |
+| apothecary | Brother Fennick's Apothecary | Mon–Sat | 3 | — | 0.97 |
+| lane-kingsreach-east | Kingsreach → Eastern Camp wagons *(DC transfer lane)* | Mon–Sat | 1 | — | 0.98 |
+| lane-kingsreach-harrowmere | Kingsreach → Harrowmere convoy *(DC transfer lane)* | Mon, Wed, Fri | 2 | — | 0.95 |
+
+Every outside vendor takes at least `rules.minVendorLeadTimeDays` (3); a content test enforces it.
+The transfer lanes are internal: `dcDepotId` = `kingsreach-dc`; `DC_LANES` maps each lane to the
+front depot it serves.
 | royal-armory | Royal Armory of Kingsreach | Fri | 4 | 400 silver, trigger 0.6 | 0.99 |
 
 ## Multi-sourcing
@@ -122,7 +140,8 @@ store's `selectLetterText`).
 | VII | tutorial-7 | multi-sourcing: priority, split, reliability | grain, oats, arrows @ eastern-camp | abbey, river, fletchers, armory | 35 |
 | VIII | tutorial-8 | **forecast override** (daily or aggregate), SWAPE/bias | grain, ale, bandages @ eastern-camp + the silent `levies-arrive` letter | abbey, river, apothecary | 35 |
 | IX | tutorial-9 | battle plans, trusting the letter, budget, fiscal period, rank | arrows (guild only), pitch, rope, bandages, grain @ harrowmere; grain, ale @ eastern-camp | 5 vendors | 56 |
-| — | sandbox | everything | all 14 items × 3 depots (38 locations) | all 6 | 112 |
+| X | tutorial-10 | distribution centre, transfer orders, dependent demand, carrying stock at the DC | grain, hardtack, arrows via Kingsreach DC to eastern-camp and harrowmere; bandages direct @ harrowmere | abbey, fletchers, apothecary + 2 lanes | 42 |
+| — | sandbox | everything | all 14 items × 3 front depots (38 locations) + Kingsreach DC (grain, hardtack, salt pork, oats, arrows to Eastern Camp and Harrowmere; the Northern Pass and other items direct) | all 6 + 2 lanes | 112 |
 
 ## Ranks, letters, difficulty (`ranks.ts`)
 

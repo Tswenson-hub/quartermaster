@@ -16,7 +16,7 @@ import { DEPOTS } from './depots';
 import { generateHistory, type DemandSpec } from './history';
 import { ITEMS, ITEM_IDS } from './items';
 import { SOURCING } from './sourcing';
-import { VENDORS } from './vendors';
+import { DC_LANES, VENDORS } from './vendors';
 
 /** Pre-campaign history length: 8 full weeks, so history[i] falls on weekday i % 7. */
 const HISTORY_DAYS = 56;
@@ -91,6 +91,17 @@ interface ScenarioSpec {
   rankLevel?: number;
   /** Warm-up days before takeover (multiple of 7); default rules.warmup.days. */
   warmupDays?: number;
+  /** Route these items through a distribution centre to every front depot that has a lane in vendorIds. */
+  dc?: DcSpec;
+}
+
+interface DcSpec {
+  depotId: DepotId;
+  items: ItemId[];
+  /** DC opening stock and minimum fill, in days of the lane-served depots' combined mean demand. */
+  onHandDays: number;
+  minimumFillDays: number;
+  serviceLevel?: number;
 }
 
 function pick<T>(record: Record<string, T>, ids: string[]): Record<string, T> {
@@ -101,8 +112,12 @@ function pick<T>(record: Record<string, T>, ids: string[]): Record<string, T> {
   }));
 }
 
-/** Sourcing rules for the scenario; re-normalises split shares over the vendors that remain. */
-function scenarioSourcing(itemIds: ItemId[], vendorIds: VendorId[], lines: LineSpec[]): SourcingRule[] {
+/**
+ * Sourcing rules for the scenario; re-normalises split shares over the vendors that remain.
+ * With a DC: for each DC item, front depots served by a lane in the scenario buy from that lane
+ * (transfer), while the DC (and any front depot without a lane) buys from the outside vendors.
+ */
+function scenarioSourcing(itemIds: ItemId[], vendorIds: VendorId[], lines: LineSpec[], dc?: DcSpec): SourcingRule[] {
   const out: SourcingRule[] = [];
   for (const itemId of itemIds) {
     const restrict = lines.find((l) => l.itemId === itemId && l.sources)?.sources;
@@ -110,13 +125,36 @@ function scenarioSourcing(itemIds: ItemId[], vendorIds: VendorId[], lines: LineS
       (r) => r.itemId === itemId && vendorIds.includes(r.vendorId) && (!restrict || restrict.includes(r.vendorId)),
     );
     if (rules.length === 0) throw new Error(`content: no source for "${itemId}" in scenario`);
-    const shareTotal = rules.reduce((s, r) => s + (r.splitShare ?? 0), 0);
+
+    let vendorScope: DepotId[] | undefined;
+    if (dc?.items.includes(itemId)) {
+      const fronts = [...new Set(lines.filter((l) => l.itemId === itemId).map((l) => l.depotId))];
+      const lanes = DC_LANES.filter(
+        (lane) => lane.dcDepotId === dc.depotId && vendorIds.includes(lane.vendorId) && fronts.includes(lane.frontDepotId),
+      );
+      const direct = fronts.filter((d) => !lanes.some((lane) => lane.frontDepotId === d));
+      vendorScope = [dc.depotId, ...direct];
+      for (const lane of lanes) {
+        out.push({
+          itemId,
+          vendorId: lane.vendorId,
+          // Valuation only: transfers cost nothing against the budget (silver is spent when the DC buys).
+          unitCost: Math.min(...rules.map((r) => r.unitCost)),
+          packSize: Math.min(...rules.map((r) => r.packSize)),
+          priority: 1,
+          depotIds: [lane.frontDepotId],
+        });
+      }
+    }
+
+    const shareTotal = rules.reduce((sum, r) => sum + (r.splitShare ?? 0), 0);
     for (const r of rules) {
       const { splitShare, ...rest } = r;
+      const scoped = vendorScope ? { ...rest, depotIds: vendorScope } : rest;
       if (splitShare !== undefined && rules.length > 1 && shareTotal > 0) {
-        out.push({ ...rest, splitShare: splitShare / shareTotal });
+        out.push({ ...scoped, splitShare: splitShare / shareTotal });
       } else {
-        out.push(rest);
+        out.push(scoped);
       }
     }
   }
@@ -143,11 +181,11 @@ function buildPeriods(lengthDays: number, periodLengthDays: number, allowance: n
 
 function buildScenario(s: ScenarioSpec): Scenario {
   const itemIds = [...new Set(s.lines.map((l) => l.itemId))];
-  const depotIds = [...new Set(s.lines.map((l) => l.depotId))];
+  const depotIds = [...new Set([...s.lines.map((l) => l.depotId), ...(s.dc ? [s.dc.depotId] : [])])];
   const items: Record<ItemId, Item> = pick(ITEMS, itemIds);
   const vendors: Record<VendorId, Vendor> = pick(VENDORS, s.vendorIds);
   const depots: Record<DepotId, Depot> = pick(DEPOTS, depotIds);
-  const sourcing = scenarioSourcing(itemIds, s.vendorIds, s.lines);
+  const sourcing = scenarioSourcing(itemIds, s.vendorIds, s.lines, s.dc);
 
   const battlePlans: BattlePlan[] = (s.battlePlanIds ?? []).map((id) => {
     const p = BATTLE_PLANS_BY_ID[id];
@@ -174,6 +212,25 @@ function buildScenario(s: ScenarioSpec): Scenario {
       history: generateHistory(s.seed, l.itemId, l.depotId, spec, HISTORY_DAYS),
     };
   });
+
+  // DC locations: no consumption of their own (demand = the depots' planned transfers), so no history.
+  if (s.dc) {
+    const dc = s.dc;
+    for (const itemId of dc.items) {
+      const served = s.lines.filter(
+        (l) => l.itemId === itemId && sourcing.some((r) => r.itemId === itemId && VENDORS[r.vendorId]?.dcDepotId && r.depotIds?.includes(l.depotId)),
+      );
+      const mean = served.reduce((sum, l) => sum + (l.demand?.mean ?? BASE_DEMAND[itemId].mean), 0);
+      locations.push({
+        itemId,
+        depotId: dc.depotId,
+        onHand: Math.round(mean * dc.onHandDays),
+        serviceLevel: dc.serviceLevel ?? 0.95,
+        minimumFill: Math.round(mean * dc.minimumFillDays),
+        history: [],
+      });
+    }
+  }
 
   const periodAllowance = roundToTwoFigures((campaignSpend / s.lengthDays) * s.periodLengthDays * s.allowanceFactor);
 
@@ -398,6 +455,35 @@ const tutorial: ScenarioSpec[] = [
     ],
     battlePlanIds: ['harrowmere-assault', 'feast-muster'],
   },
+  {
+    id: 'tutorial-10',
+    title: 'X. The Royal Depot at Kingsreach',
+    briefing:
+      'The Crown has opened a DISTRIBUTION CENTRE at Kingsreach. The abbey and the Guild now deliver ' +
+      'in bulk to the Royal Depot, and your camps draw from it by TRANSFER ORDER: wagons to the Eastern ' +
+      'Camp six days a week (one day on the road), convoys to Harrowmere three times a week (two days). ' +
+      'Transfers cost the Treasury nothing; the silver is spent when the depot buys. The depot eats ' +
+      "nothing itself. Its forecast is the camps' planned transfers: DEPENDENT DEMAND. Keep a reserve " +
+      'at Kingsreach. Stock there is half as dear to hold, and one pooled stockpile covers both camps\' ' +
+      'bad days, so the front can run leaner. Ordering for two camps also clears the Guild\'s ' +
+      'minimum easily. Bandages still come straight from the apothecary.',
+    teaches: ['distribution centre', 'transfer orders', 'dependent demand', 'carrying stock at the DC'],
+    seed: 2010,
+    lengthDays: 42,
+    periodLengthDays: 28,
+    allowanceFactor: 1.25,
+    vendorIds: ['abbey-granary', 'guild-fletchers', 'apothecary', 'lane-kingsreach-east', 'lane-kingsreach-harrowmere'],
+    lines: [
+      { itemId: 'grain', depotId: 'eastern-camp', onHandDays: 4 },
+      { itemId: 'grain', depotId: 'harrowmere', onHandDays: 5 },
+      { itemId: 'hardtack', depotId: 'eastern-camp', onHandDays: 4 },
+      { itemId: 'hardtack', depotId: 'harrowmere', onHandDays: 5 },
+      { itemId: 'arrows', depotId: 'eastern-camp', onHandDays: 4 },
+      { itemId: 'arrows', depotId: 'harrowmere', onHandDays: 5 },
+      { itemId: 'bandages', depotId: 'harrowmere', onHandDays: 5 },
+    ],
+    dc: { depotId: 'kingsreach-dc', items: ['grain', 'hardtack', 'arrows'], onHandDays: 8, minimumFillDays: 3 },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -417,7 +503,7 @@ const sandbox: ScenarioSpec = {
   id: 'sandbox',
   title: 'The Long Campaign (Sandbox)',
   briefing:
-    'Three depots, six suppliers, fourteen supplies and a season of war. Every rule is in play. ' +
+    'Three depots, a royal distribution centre, six suppliers, fourteen supplies and a season of war. Every rule is in play. ' +
     'Keep the front fed and armed for sixteen weeks without emptying the treasury.',
   teaches: ['everything'],
   seed: 9001,
@@ -427,6 +513,9 @@ const sandbox: ScenarioSpec = {
   vendorIds: Object.keys(VENDORS),
   lines: sandboxLines,
   battlePlanIds: ['harrowmere-assault', 'feast-muster', 'winter-crossing', 'ford-feint'],
+  // Staples flow through Kingsreach to the Eastern Camp and Harrowmere. The Northern Pass, and
+  // everything perishable, medical or for the siege train, still goes direct to the front.
+  dc: { depotId: 'kingsreach-dc', items: ['grain', 'hardtack', 'salt-pork', 'oats', 'arrows'], onHandDays: 7, minimumFillDays: 3 },
 };
 
 export const TUTORIAL_SCENARIOS: Scenario[] = tutorial.map(buildScenario);

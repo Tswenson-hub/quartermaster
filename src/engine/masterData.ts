@@ -76,6 +76,7 @@ export function vendorStats(state: GameState, r: Rules = defaultRules): VendorSt
       trigger: effectiveTrigger(state, id, r),
       customTrigger: state.vendorTriggers?.[id] !== undefined,
       itemsSupplied: new Set(state.sourcing.filter((s) => s.vendorId === id).map((s) => s.itemId)).size,
+      ...(vendor.dcDepotId !== undefined ? { dcDepotId: vendor.dcDepotId } : {}),
       ordersPlaced: delivered.length + open.length,
       unitsOrdered: sum([...delivered, ...open].map((o) => o.qty)),
       spend: sum([...delivered, ...open].map((o) => o.cost)),

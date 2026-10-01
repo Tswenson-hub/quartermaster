@@ -26,6 +26,11 @@ export function roundToPack(need: number, packSize: number, r: Rules = defaultRu
   return (exact - whole >= r.packRounding.threshold ? whole + 1 : whole) * pack;
 }
 
+/** A sourcing rule applies to an item-location when the item matches and depotIds (if set) includes it. */
+export function appliesTo(rule: SourcingRule, itemId: string, depotId?: DepotId): boolean {
+  return rule.itemId === itemId && (!rule.depotIds || depotId === undefined || rule.depotIds.includes(depotId));
+}
+
 /**
  * Source for an item's next order opportunity (§7 default): the vendor with the earliest
  * order day on or after today; ties go to the preferred source (lowest `priority`, then
@@ -34,10 +39,11 @@ export function roundToPack(need: number, packSize: number, r: Rules = defaultRu
 export function chooseSource(
   state: GameState,
   itemId: string,
+  depotId?: DepotId,
 ): { rule: SourcingRule; vendor: Vendor; orderDay: Day } | undefined {
   let best: { rule: SourcingRule; vendor: Vendor; orderDay: Day } | undefined;
   for (const rule of state.sourcing) {
-    if (rule.itemId !== itemId) continue;
+    if (!appliesTo(rule, itemId, depotId)) continue;
     const vendor = effectiveVendor(state, rule.vendorId);
     if (!vendor) continue;
     const orderDay = nextOrderDayFrom(vendor, state.today);
@@ -73,17 +79,23 @@ export function computePlanning(
   vendor: Vendor,
   orderDay: Day,
   r: Rules = defaultRules,
+  /** Extra receipts by day from today (index 0 = today), e.g. simulated planned orders. */
+  plannedReceipts: readonly number[] = [],
 ): PlanningDetail {
+  // Transfers from a DC cost nothing against the budget: price the lane at 0 so proposals,
+  // vendor-minimum values and placed orders agree.
+  if (vendor.dcDepotId !== undefined && rule.unitCost !== 0) rule = { ...rule, unitCost: 0 };
   const { d1, d2 } = deliveryDates(vendor, orderDay);
   const measureDay = r.projection.measureAtD2 === 'before-d2-receipt' ? d2 - 1 : d2;
 
   const totals = forecastLocation(state, loc, state.today, measureDay, r).map((p) => p.total);
   // Lost sales are clamped only before D1: demand from D1 on is this order's to cover, so the
   // projection there runs unclamped and a negative projectedAtD2 is the deficit to fill.
+  const receipts = receiptsByDay(state, loc, measureDay).map((q, i) => q + (plannedReceipts[i] ?? 0));
   const proj = projectStock(
     loc.onHand,
     totals,
-    receiptsByDay(state, loc, measureDay),
+    receipts,
     r.projection.lostSales,
     d1 - state.today,
   );
@@ -123,7 +135,7 @@ export function computePlanning(
 
 /** Planning detail for an item-location at its next order opportunity; undefined if unsourced. */
 export function planningDetail(state: GameState, loc: ItemLocation, r: Rules = defaultRules): PlanningDetail | undefined {
-  const source = chooseSource(state, loc.itemId);
+  const source = chooseSource(state, loc.itemId, loc.depotId);
   return source && computePlanning(state, loc, source.rule, source.vendor, source.orderDay, r);
 }
 

@@ -1,4 +1,4 @@
-import type { Vendor, VendorId } from '../engine/types';
+import type { DepotId, Vendor, VendorId } from '../engine/types';
 
 /**
  * Suppliers to the army. Weekdays: 0 = Monday … 6 = Sunday.
@@ -67,6 +67,33 @@ const list: Vendor[] = [
     orderTrigger: 0.6,
     reliability: 0.99,
   },
+
+  // --- Internal transfer lanes (DC → front). Not outside suppliers: transfers ship from DC stock,
+  // cost nothing against the budget, and have no minimum. Order days/lead time describe the lane.
+  {
+    // The King's Road is paved and short: wagons leave every day but the Sabbath, arrive next day.
+    id: 'lane-kingsreach-east',
+    name: 'Kingsreach → Eastern Camp wagons',
+    dcDepotId: 'kingsreach-dc',
+    orderDays: [0, 1, 2, 3, 4, 5],
+    leadTimeDays: 1,
+    reliability: 0.98,
+  },
+  {
+    // Escorted convoys to the siege lines, three times a week, two days on the road.
+    id: 'lane-kingsreach-harrowmere',
+    name: 'Kingsreach → Harrowmere convoy',
+    dcDepotId: 'kingsreach-dc',
+    orderDays: [0, 2, 4],
+    leadTimeDays: 2,
+    reliability: 0.95,
+  },
+];
+
+/** Which front depot each DC transfer lane serves (the lane vendor's sourcing rules are scoped to it). */
+export const DC_LANES: { vendorId: VendorId; dcDepotId: DepotId; frontDepotId: DepotId }[] = [
+  { vendorId: 'lane-kingsreach-east', dcDepotId: 'kingsreach-dc', frontDepotId: 'eastern-camp' },
+  { vendorId: 'lane-kingsreach-harrowmere', dcDepotId: 'kingsreach-dc', frontDepotId: 'harrowmere' },
 ];
 
 export const VENDORS: Record<VendorId, Vendor> = Object.fromEntries(list.map((v) => [v.id, v]));

@@ -1,4 +1,5 @@
 // Forecast: baseline + battle-plan uplift + player overrides (docs/RELEX_RULES.md §8).
+import { dependentDemand, isDc } from './dc';
 import { rules as defaultRules, type Rules } from './rules.config';
 import type { Day, DepotId, ForecastPoint, GameState, ItemId, ItemLocation } from './types';
 
@@ -83,9 +84,12 @@ export function forecastLocation(
     return steps[Math.max(0, steps.length - 1 - (state.today - day))];
   };
   const overrides = state.overrides.filter((o) => o.itemId === loc.itemId && o.depotId === loc.depotId);
+  // A DC has no consumption of its own: from today on, its baseline is dependent demand (the
+  // front depots' planned transfer orders by ship day); 0 beyond the planning horizon.
+  const dependent = isDc(state, loc.depotId) ? dependentDemand(state, loc, r) : undefined;
   for (let day = from; day <= to; day++) {
     const asOf = Math.min(day, state.today);
-    const baseline = baselineOn(day);
+    const baseline = dependent && day >= state.today ? (dependent[day - state.today] ?? 0) : baselineOn(day);
 
     const plans = state.battlePlans.filter(
       (p) =>
