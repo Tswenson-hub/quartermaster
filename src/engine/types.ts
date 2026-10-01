@@ -76,7 +76,11 @@ export interface ItemLocation {
   serviceLevel: number;
   /** Minimum presentation / display stock (e.g. "always keep 1 cart at camp"). */
   presentationStock: number;
-  /** Demand history, index = Day. */
+  /**
+   * Actual daily demand, oldest first; the last entry is always yesterday (today − 1).
+   * Scenarios seed it with pre-campaign history; tick() appends each day's actual demand.
+   * So the demand on day d is history[history.length - (today - d)].
+   */
   history: number[];
 }
 
@@ -213,4 +217,43 @@ export interface Scenario {
   initial: Omit<GameState, 'today' | 'proposals' | 'exceptions' | 'kpis' | 'openOrders'> & {
     openOrders?: OpenOrder[];
   };
+}
+
+// ---------------------------------------------------------------------------
+// Engine API — the functions the store calls. Implemented in src/engine/index.ts
+// (re-exporting from calendar/forecast/projection/replenishment/tick). All pure and
+// deterministic given state.seed; none mutate their input.
+// ---------------------------------------------------------------------------
+
+/** One player decision on a proposal line, as handed to the engine at end of day. */
+export interface ProposalDecisionInput {
+  /** Index into GameState.proposals. */
+  index: number;
+  decision: ProposalDecision;
+  /** Edited quantity for an accepted line; engine rounds to pack size and recomputes cost. */
+  qty?: number;
+}
+
+export interface EngineApi {
+  /** Build day-0 state from a scenario: periods, empty kpis/exceptions, proposals + exceptions computed. */
+  initGame(scenario: Scenario): GameState;
+  /**
+   * Recompute derived state for `today` (proposals, exceptions) after the player changes
+   * inputs (e.g. overrides). Must not advance time or consume RNG.
+   */
+  refresh(state: GameState): GameState;
+  /** Daily forecast for one item-location, inclusive day range. */
+  forecast(state: GameState, itemId: ItemId, depotId: DepotId, from: Day, to: Day): ForecastPoint[];
+  /** Projected end-of-day stock for days from..to inclusive (index 0 = `from`), incl. open orders. */
+  project(state: GameState, itemId: ItemId, depotId: DepotId, from: Day, to: Day): number[];
+  /**
+   * Turn accepted decisions into OpenOrders (commit spend to the current FiscalPeriod).
+   * Rejected/deferred lines are dropped. Does not advance time.
+   */
+  placeOrders(state: GameState, decisions: ProposalDecisionInput[]): GameState;
+  /**
+   * Advance one day: receive deliveries, consume (seeded) actual demand, spoilage, holding
+   * cost, budget/morale, KPIs. Returns state with today+1 and fresh proposals + exceptions.
+   */
+  tick(state: GameState): GameState;
 }
