@@ -85,7 +85,7 @@ function ItemDetail({ game, loc }: { game: GameState; loc: ItemLocation }) {
         {params && (
           <p className={`verdict ${belowMop ? 'verdict-bad' : 'verdict-ok'}`}>
             {belowMop ? '⚠ ' : '✓ '}
-            <Term k="projected">Projected stock</Term> on <Term k="d2" /> ({fmtDay(params.d2)}) is{' '}
+            <Term k="projected">Projected stock</Term> just before the <Term k="d2" /> delivery ({fmtDay(params.d2)}) is{' '}
             <strong>{fmtQty(params.projectedAtD2)}</strong> — {belowMop ? 'below' : 'above'} the <Term k="mop" /> of{' '}
             <strong>{fmtQty(params.mustOrderPoint)}</strong>.{' '}
             {belowMop ? 'You must order today or the men go without.' : 'No order needed to stay safe.'}
@@ -93,7 +93,8 @@ function ItemDetail({ game, loc }: { game: GameState; loc: ItemLocation }) {
         )}
         <PlanningCharts view={view} unit={item.unit} battlePlans={game.battlePlans.filter((b) => b.announcedOn <= game.today && b.depotIds.includes(loc.depotId))} />
         <p className="chart-note muted">
-          Shaded days are battle-plan windows. The dot on D2 is the stock this order must protect.
+          Shaded days are battle-plan windows. The dot is the stock just before the D2 delivery: the level this order must
+          keep above the MOP.
         </p>
       </Panel>
 
@@ -117,7 +118,7 @@ function ItemDetail({ game, loc }: { game: GameState; loc: ItemLocation }) {
               <dd>{fmtDay(params.d1)}</dd>
               <dt><Term k="d2" /> <span className="muted">next wagon</span></dt>
               <dd>{fmtDay(params.d2)}</dd>
-              <dt>Projected at D2</dt>
+              <dt>Projected before D2 delivery</dt>
               <dd className={belowMop ? 'bad-text' : undefined}>{fmtQty(params.projectedAtD2)}</dd>
               <dt>Order-up-to</dt>
               <dd>{fmtQty(params.orderUpTo)}</dd>

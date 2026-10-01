@@ -53,7 +53,7 @@ interface Props {
 }
 
 export function PlanningCharts({ view, unit, battlePlans }: Props) {
-  const { points, params, today } = view;
+  const { points, params, today, d2CheckDay } = view;
   const first = points[0]?.day ?? 0;
   const last = points[points.length - 1]?.day ?? 0;
   const domain: [number, number] = [first, last];
@@ -83,7 +83,7 @@ export function PlanningCharts({ view, unit, battlePlans }: Props) {
                 <ReferenceLine x={params.d1} stroke={MUTED} strokeDasharray="2 3" label={{ value: 'D1', position: 'top', fill: INK, fontSize: 12 }} />
                 <ReferenceLine x={params.d2} stroke={INK} strokeDasharray="2 3" label={{ value: 'D2', position: 'top', fill: INK, fontSize: 12 }} />
                 <ReferenceDot
-                  x={params.d2}
+                  x={d2CheckDay ?? params.d2}
                   y={params.projectedAtD2}
                   r={6}
                   fill={params.projectedAtD2 < params.mustOrderPoint ? MOP : SERIES.projected}

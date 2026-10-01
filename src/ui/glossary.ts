@@ -52,7 +52,7 @@ export const GLOSSARY: Record<TermKey, GlossaryEntry> = {
     term: 'D2 — Second delivery date',
     flavour: 'When the wagon after this one arrives.',
     plain:
-      'The arrival day of the NEXT order you could place with this supplier. Today’s order must carry you until then, so the rule is: keep projected stock at D2 above the MOP.',
+      'The arrival day of the NEXT order you could place with this supplier. Today’s order must carry you until then, so the rule is: keep projected stock above the MOP at D2, measured at the end of the day just before the D2 delivery arrives.',
   },
   proposal: {
     term: 'Order proposal',
