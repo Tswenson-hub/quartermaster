@@ -163,7 +163,8 @@ export function placeOrders(state: GameState, decisions: ProposalDecisionInput[]
  * Vendor minimums at acceptance (RELEX_RULES §6), per (vendor, depot) order placed today.
  * A short order is accepted with the vendor's surcharge — set once, as `surcharge` on the
  * order's first line and included in its cost — or dropped if the vendor defines no
- * surcharge. If lines for that vendor/depot were already placed today, the order already passed this check.
+ * surcharge. If lines for that vendor/depot were already placed today, the order already
+ * passed this check.
  */
 function applyMinimumSurcharges(state: GameState, newOrders: OpenOrder[]): OpenOrder[] {
   const groups = new Map<string, OpenOrder[]>();
