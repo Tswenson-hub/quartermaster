@@ -1,5 +1,5 @@
 // Order calendar: order weekdays, lead times, D1/D2 (docs/RELEX_RULES.md §1).
-import type { Day, Vendor, Weekday } from './types';
+import type { Day, GameState, Vendor, VendorId, Weekday } from './types';
 
 export function weekdayOf(day: Day): Weekday {
   return (((day % 7) + 7) % 7) as Weekday;
@@ -39,4 +39,33 @@ export function deliveryDates(vendor: Vendor, orderDay: Day): DeliveryDates {
     d1: orderDay + vendor.leadTimeDays,
     d2: nextOrderDayAfter(vendor, orderDay) + vendor.leadTimeDays,
   };
+}
+
+const ALL_DAYS: Weekday[] = [0, 1, 2, 3, 4, 5, 6];
+const isWeekday = (x: unknown): x is Weekday => Number.isInteger(x) && (x as number) >= 0 && (x as number) <= 6;
+
+/**
+ * A vendor's order weekdays after the player's schedule override (GameState.vendorOrderDays):
+ * 'daily' → every day; 'weekly' → that weekday (an invalid weekday falls back to the vendor's
+ * own days); no override → Vendor.orderDays. Unknown vendor → [].
+ */
+export function effectiveOrderDays(state: GameState, vendorId: VendorId): Weekday[] {
+  const vendor = state.vendors[vendorId];
+  if (!vendor) return [];
+  const schedule = state.vendorOrderDays?.[vendorId];
+  if (schedule?.kind === 'daily') return [...ALL_DAYS];
+  if (schedule?.kind === 'weekly' && isWeekday(schedule.weekday)) return [schedule.weekday];
+  return vendor.orderDays;
+}
+
+/**
+ * The vendor with its effective order days, or undefined if it is unknown or has no order
+ * days at all. Planning code goes through this, so nextOrderDayAfter never sees an empty calendar.
+ */
+export function effectiveVendor(state: GameState, vendorId: VendorId): Vendor | undefined {
+  const vendor = state.vendors[vendorId];
+  if (!vendor) return undefined;
+  const orderDays = effectiveOrderDays(state, vendorId);
+  if (orderDays.length === 0) return undefined;
+  return orderDays === vendor.orderDays ? vendor : { ...vendor, orderDays };
 }
