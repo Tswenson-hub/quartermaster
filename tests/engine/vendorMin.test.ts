@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { generatePlanLines } from '../../src/engine/replenishment';
 import { rules, type Rules } from '../../src/engine/rules.config';
 import type { Vendor } from '../../src/engine/types';
-import { applyVendorMinimums, buildToMinimum, type BuildCandidate } from '../../src/engine/vendorMin';
+import { refresh } from '../../src/engine/tick';
+import { applyVendorMinimums, buildToMinimum, effectiveTrigger, type BuildCandidate } from '../../src/engine/vendorMin';
 import { item, loc, source, state, vendor } from './fixtures';
 
 // All items: forecast 10/day, MOP 40, pack 10, unit cost 2. Monday order, D2 check = end of day 5.
@@ -23,7 +24,7 @@ function setup(minimum: Vendor['minimum'], extra = {}) {
 }
 const run = (minimum: Vendor['minimum'], trigger: number, r: Rules = rules, extra = {}) => {
   const { s, lines } = setup(minimum, extra);
-  return applyVendorMinimums(s, lines, () => trigger, r);
+  return applyVendorMinimums({ ...s, vendorTriggers: { v: trigger } }, lines, r);
 };
 const table = (ps: { itemId: string; reason: string; qty: number }[]) => ps.map((p) => [p.itemId, p.reason, p.qty]);
 
@@ -91,7 +92,7 @@ describe('CO-MRP build to minimum (golden)', () => {
   });
 
   it("buildPriority 'criticality': the most critical item takes the first pack", () => {
-    const r: Rules = { ...rules, vendorMin: { ...rules.vendorMin, buildPriority: 'criticality' } };
+    const r: Rules = { ...rules, vendorMinimum: { ...rules.vendorMinimum, buildPriority: 'criticality' } };
     const out = run({ kind: 'units', amount: 40 }, 0.3, r, {
       items: { a: item('a'), b: item('b'), c: item('c'), d: item('d', { criticality: 5 }) },
     });
@@ -108,7 +109,9 @@ describe('CO-MRP build to minimum (golden)', () => {
   it('no must need → no order and no exception', () => {
     const { s } = setup({ kind: 'units', amount: 100 });
     const s2 = { ...s, locations: s.locations.filter((l) => l.itemId !== 'a') };
-    expect(applyVendorMinimums(s2, generatePlanLines(s2), () => 0)).toEqual({ proposals: [], exceptions: [] });
+    const out = applyVendorMinimums(s2, generatePlanLines(s2));
+    expect(out.proposals).toEqual([]);
+    expect(out.exceptions).toEqual([]);
   });
 
   it('vendor without a minimum: must lines only', () => {
@@ -127,5 +130,40 @@ describe('CO-MRP build to minimum (golden)', () => {
       must,
     });
     expect(buildToMinimum([c('x', true, 0), c('y', false, 0)], { kind: 'units', amount: 50 }, 0).outcome).toBe('built-short');
+  });
+});
+
+describe('order trigger lookup and vendorPlans', () => {
+  it('player override ?? vendor default ?? rules default', () => {
+    const { s } = setup({ kind: 'units', amount: 100 });
+    expect(effectiveTrigger(s, 'v')).toBe(rules.vendorMinimum.defaultTrigger);
+    const withVendor = { ...s, vendors: { v: { ...s.vendors.v, orderTrigger: 0.2 } } };
+    expect(effectiveTrigger(withVendor, 'v')).toBe(0.2);
+    expect(effectiveTrigger({ ...withVendor, vendorTriggers: { v: 0.9 } }, 'v')).toBe(0.9);
+  });
+
+  it('refresh fills one VendorPlan per vendor ordering today', () => {
+    const { s } = setup({ kind: 'units', amount: 100 });
+    const below = refresh({ ...s, vendorTriggers: { v: 0.5 } });
+    expect(below.vendorPlans).toEqual([{ vendorId: 'v', need: 30, minimum: 100, trigger: 0.5, ratio: 0.3, status: 'below-trigger' }]);
+    expect(below.proposals).toEqual([]);
+    const built = refresh({ ...s, vendorTriggers: { v: 0.3 } });
+    expect(built.vendorPlans[0]).toMatchObject({ status: 'built', ratio: 0.3 });
+    expect(built.proposals.reduce((a, p) => a + p.qty, 0)).toBe(100);
+    expect(refresh({ ...s, vendors: { v: vendor('v') } }).vendorPlans).toEqual([
+      { vendorId: 'v', need: 60, trigger: rules.vendorMinimum.defaultTrigger, ratio: 1, status: 'no-minimum' },
+    ]);
+    expect(refresh({ ...s, vendors: { v: vendor('v', { minimum: { kind: 'units', amount: 20 } }) } }).vendorPlans[0].status).toBe('meets-minimum');
+  });
+
+  it('one minimum per vendor across depots', () => {
+    const { s } = setup({ kind: 'units', amount: 100 }, {
+      depots: { camp: { id: 'camp', name: 'Camp' }, north: { id: 'north', name: 'North' } },
+    });
+    const two = { ...s, locations: [...s.locations, loc('a', { depotId: 'north', onHand: 70 })], vendorTriggers: { v: 0.6 } };
+    // Need 30 + 30 = 60% of 100 → built across both depots.
+    const out = refresh(two);
+    expect(out.vendorPlans).toEqual([expect.objectContaining({ need: 60, status: 'built' })]);
+    expect(out.proposals.reduce((a, p) => a + p.qty, 0)).toBe(100);
   });
 });

@@ -129,12 +129,14 @@ describe('safety stock and MOP', () => {
     expect(rules.safetyStock({ serviceLevel: 0.95, forecastErrorStdDev: 5, leadTimeDays: 3, reviewPeriodDays: 3, avgDailyForecast: 10 })).toBe(21);
   });
 
-  it('MOP = safety stock from history error + presentation stock', () => {
+  it('MOP = max(safety stock from forecast error, minimum fill)', () => {
     const history = [10, 10, 10, 20];
-    const p = planningParams(state({ locations: [loc('grain', { history })] }), 'grain', 'camp')!;
-    const expected = Math.ceil(zScore(0.95) * Math.sqrt(100 / 3) * Math.sqrt(6)); // = 24
-    expect(p.safetyStock).toBe(expected);
-    expect(p.mustOrderPoint).toBe(expected + 40);
+    // σ = √(100/3); SS = ceil(1.6449 × 5.774 × √6) = ceil(23.26) = 24
+    const at = (minimumFill: number) =>
+      planningParams(state({ locations: [loc('grain', { history, minimumFill })] }), 'grain', 'camp')!;
+    expect(at(40)).toMatchObject({ safetyStock: 24, minimumFill: 40, mustOrderPoint: 40 });
+    expect(at(10)).toMatchObject({ safetyStock: 24, minimumFill: 10, mustOrderPoint: 24 });
+    expect(Math.ceil(zScore(0.95) * Math.sqrt(100 / 3) * Math.sqrt(6))).toBe(24);
   });
 });
 

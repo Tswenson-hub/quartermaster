@@ -14,7 +14,7 @@ export interface SafetyStockInput {
 }
 
 export interface Rules {
-  /** Must Order Point = safety stock + presentation stock (default). */
+  /** Statistical safety stock (§3). MOP = max(safety stock, ItemLocation.minimumFill). */
   safetyStock: (i: SafetyStockInput) => number;
   /** Can Order Point as a multiple over MOP, or extra days of cover. */
   canOrderPoint: { extraDaysOfCover: number };
@@ -31,20 +31,6 @@ export interface Rules {
     | { method: 'exp-smoothing'; alpha: number; initWindow: number };
   /** How battle-plan uplift combines with baseline. */
   eventBlend: 'multiply' | 'add';
-  /**
-   * Vendor minimums (§4 CO-MRP, §6). If the must-order need (pack-rounded, in the minimum's
-   * units or value) ÷ the minimum ≥ the order trigger, the order is BUILT up to the minimum one
-   * pack at a time, each pack going to the item with the greatest need (re-evaluated after
-   * every pack); below the trigger no order is proposed for that vendor.
-   */
-  vendorMin: {
-    /** Trigger used when the vendor/player has not set one (0–1 of the minimum). */
-    defaultOrderTrigger: number;
-    /** Greatest need = lowest projected days of cover at D2, or highest criticality first. */
-    buildPriority: 'days-of-cover' | 'criticality';
-    /** Safety valve on the build loop. */
-    maxPacks: number;
-  };
   budget: {
     /** Fraction of allowance over which penalties start. */
     overspendTolerance: number;
@@ -100,7 +86,13 @@ export interface Rules {
    * minimum one pack at a time (item with lowest projected days of cover at D2, re-ranked after each
    * pack); below the trigger, no proposal for that vendor. Default trigger when the vendor sets none.
    */
-  vendorMinimum: { defaultTrigger: number };
+  vendorMinimum: {
+    defaultTrigger: number;
+    /** Greatest need = lowest projected days of cover at D2 (default), or highest criticality first. */
+    buildPriority: 'days-of-cover' | 'criticality';
+    /** Safety valve on the build loop. */
+    maxPacks: number;
+  };
   /**
    * §11 market-driven demand. Each day's demand rate = base rate × factor, where
    * factor = clamp((close[d] ÷ mean(close)) ^ sensitivity, minFactor, maxFactor), then seeded noise.
@@ -155,7 +147,6 @@ export const rules: Rules = {
   packRounding: { mode: 'up' },
   forecast: { method: 'exp-smoothing', alpha: 0.2, initWindow: 7 },
   eventBlend: 'multiply',
-  vendorMin: { defaultOrderTrigger: 0.5, buildPriority: 'days-of-cover', maxPacks: 10000 },
   budget: { overspendTolerance: 0, overspendCarryPenalty: 1, moralePerOverspendPct: 0.5 },
   morale: { perUnitStockoutByCriticality: 0.05, dailyRecovery: 0.5 },
   projection: { measureAtD2: 'before-d2-receipt', lostSales: true },
@@ -166,7 +157,7 @@ export const rules: Rules = {
   exceptions: { forecastDeviationPct: 0.3 },
   spoilage: { mode: 'lots' },
   delivery: { lateDaysMin: 1, lateDaysMax: 2 },
-  vendorMinimum: { defaultTrigger: 0.6 },
+  vendorMinimum: { defaultTrigger: 0.5, buildPriority: 'days-of-cover', maxPacks: 10000 },
   market: { sensitivity: 1.5, minFactor: 0.5, maxFactor: 1.8 },
   difficulty: {
     easy: { ticker: 'KO', label: 'Garrison duty', budgetFactor: 1.15 },

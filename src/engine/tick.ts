@@ -91,12 +91,7 @@ function earliestDelivery(state: GameState, loc: ItemLocation): Day | undefined 
 export function refresh(state: GameState, r: Rules = defaultRules): GameState {
   // Only lines with qty > 0: a non-must item appears only when the build pulls it in to
   // meet a vendor minimum (reason 'vendor-min-fill').
-  const { proposals, exceptions: minExceptions } = applyVendorMinimums(
-    state,
-    generatePlanLines(state, r),
-    () => r.vendorMin.defaultOrderTrigger,
-    r,
-  );
+  const { proposals, vendorPlans, exceptions: minExceptions } = applyVendorMinimums(state, generatePlanLines(state, r), r);
   const exceptions: PlanningException[] = state.exceptions.filter((e) => EVENT_KINDS.has(e.kind));
 
   for (const p of proposals) {
@@ -141,7 +136,7 @@ export function refresh(state: GameState, r: Rules = defaultRules): GameState {
     });
   }
 
-  return { ...state, proposals, exceptions };
+  return { ...state, proposals, vendorPlans, exceptions };
 }
 
 /**
@@ -194,7 +189,6 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
   const rng = rngForDay(state.seed, t);
   const events: PlanningException[] = [];
   let morale = state.morale;
-  // TODO(engine): fill absError (Σ|A−F|) and daysOfSupply (§10); lead added them as 0 with the M2 contract.
   const kpi = { day: t, demand: 0, fulfilled: 0, spoiled: 0, holdingCost: 0, spend: 0, forecast: 0, absError: 0, daysOfSupply: 0 };
 
   for (const o of state.openOrders) if (o.orderedOn === t) kpi.spend += o.cost;
@@ -289,6 +283,10 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
     }
 
     kpi.forecast += forecastToday;
+    kpi.absError += Math.abs(demand - forecastToday);
+    // Days of supply: end-of-day stock ÷ tomorrow's forecast (as of this morning); none → 0.
+    const forecastTomorrow = forecastLocation(state, loc, t + 1, t + 1, r)[0].total;
+    if (forecastTomorrow > 0) kpi.daysOfSupply += stock / forecastTomorrow;
     kpi.demand += demand;
     kpi.fulfilled += fulfilled;
     kpi.spoiled += spoiled;

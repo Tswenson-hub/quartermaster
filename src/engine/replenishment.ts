@@ -100,8 +100,8 @@ export function computePlanning(
       avgDailyForecast,
     }),
   );
-  // TODO(engine): RELEX_RULES §3 now says MOP = max(safetyStock, minimumFill) (lead renamed presentationStock).
-  const mustOrderPoint = safetyStock + loc.minimumFill;
+  // §3: the larger of statistical safety stock and the player's minimum fill.
+  const mustOrderPoint = Math.max(safetyStock, loc.minimumFill);
   return {
     itemId: loc.itemId,
     depotId: loc.depotId,

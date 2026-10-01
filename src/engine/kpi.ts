@@ -38,28 +38,33 @@ export function daysOfSupply(state: GameState, loc: ItemLocation, r: Rules = def
   return loc.onHand / avg;
 }
 
+function ratio(num: number, den: number): number {
+  if (den === 0) return num === 0 ? 0 : Infinity;
+  return num / den;
+}
+
 export interface KpiSummary {
   serviceLevel: number;
   /** Mean days of supply over item-locations with a forecast. */
   daysOfSupply: number;
   spoiled: number;
   holdingCost: number;
-  /** From the daily KPI rows (forecast vs demand, summed over locations). */
+  /** Σ absError ÷ Σ demand over the KPI rows (per-location errors, so they don't cancel). */
   swape: number;
+  /** (Σ forecast − Σ demand) ÷ Σ demand. Positive = over-forecast. */
   bias: number;
 }
 
 /** Campaign-to-date KPIs; `lastDays` limits the KPI rows used (e.g. 28 for the current period). */
 export function kpiSummary(state: GameState, lastDays?: number, r: Rules = defaultRules): KpiSummary {
   const rows = lastDays === undefined ? state.kpis : state.kpis.slice(-lastDays);
-  const withForecast = rows.filter((k) => k.forecast !== undefined);
   const dos = state.locations.map((l) => daysOfSupply(state, l, r)).filter((d) => Number.isFinite(d));
   return {
     serviceLevel: serviceLevel(rows),
     daysOfSupply: dos.length === 0 ? 0 : sum(dos) / dos.length,
     spoiled: sum(rows.map((k) => k.spoiled)),
     holdingCost: sum(rows.map((k) => k.holdingCost)),
-    swape: swape(withForecast.map((k) => k.demand), withForecast.map((k) => k.forecast!)),
-    bias: bias(withForecast.map((k) => k.demand), withForecast.map((k) => k.forecast!)),
+    swape: ratio(sum(rows.map((k) => k.absError)), sum(rows.map((k) => k.demand))),
+    bias: bias(rows.map((k) => k.demand), rows.map((k) => k.forecast)),
   };
 }

@@ -3,14 +3,16 @@ import { bias, daysOfSupply, kpiSummary, serviceLevel, swape } from '../../src/e
 import type { DailyKpi } from '../../src/engine/types';
 import { loc, state } from './fixtures';
 
-const row = (day: number, demand: number, fulfilled: number, forecast?: number, spoiled = 0): DailyKpi => ({
+const row = (day: number, demand: number, fulfilled: number, forecast: number, spoiled = 0, absError = Math.abs(demand - forecast)): DailyKpi => ({
   day,
   demand,
   fulfilled,
   spoiled,
   holdingCost: 1,
   spend: 0,
-  ...(forecast === undefined ? {} : { forecast }),
+  forecast,
+  absError,
+  daysOfSupply: 0,
 });
 
 describe('KPI functions', () => {
@@ -27,7 +29,7 @@ describe('KPI functions', () => {
   });
 
   it('service level = fulfilled / demand', () => {
-    expect(serviceLevel([row(0, 10, 10), row(1, 30, 20)])).toBe(0.75);
+    expect(serviceLevel([row(0, 10, 10, 10), row(1, 30, 20, 30)])).toBe(0.75);
     expect(serviceLevel([])).toBe(1);
   });
 
@@ -48,5 +50,11 @@ describe('KPI functions', () => {
       bias: -3 / 60,
     });
     expect(kpiSummary(s, 1)).toMatchObject({ serviceLevel: 1, swape: 0, bias: 0, spoiled: 2 });
+  });
+
+  it('SWAPE uses per-location absError, so item errors do not cancel', () => {
+    // Two items: +5 and −5 against forecast → row forecast = demand, but absError 10.
+    const s = state({ kpis: [row(0, 20, 20, 20, 0, 10)] });
+    expect(kpiSummary(s)).toMatchObject({ swape: 0.5, bias: 0 });
   });
 });

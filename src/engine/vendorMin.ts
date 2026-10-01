@@ -1,7 +1,7 @@
 // Vendor minimums — CO-MRP order trigger and build-to-minimum (docs/RELEX_RULES.md §4, §6).
 import type { PlanLine } from './replenishment';
 import { rules as defaultRules, type Rules } from './rules.config';
-import type { GameState, OrderProposal, PlanningException, Vendor, VendorId } from './types';
+import type { GameState, OrderProposal, PlanningException, Vendor, VendorId, VendorPlan } from './types';
 
 export type VendorMinimum = NonNullable<Vendor['minimum']>;
 
@@ -68,9 +68,9 @@ export function buildToMinimum(
   if (needRatio < trigger) return { outcome: 'below-trigger', needRatio, lines, steps };
 
   const key = (l: BuildCandidate): [number, number] =>
-    r.vendorMin.buildPriority === 'criticality' ? [-l.criticality, daysOfCover(l)] : [daysOfCover(l), -l.criticality];
+    r.vendorMinimum.buildPriority === 'criticality' ? [-l.criticality, daysOfCover(l)] : [daysOfCover(l), -l.criticality];
   let total = need;
-  while (total < min.amount && steps.length < r.vendorMin.maxPacks) {
+  while (total < min.amount && steps.length < r.vendorMinimum.maxPacks) {
     let pick: BuildCandidate | undefined;
     for (const l of lines) {
       if (!Number.isFinite(daysOfCover(l))) continue;
@@ -90,40 +90,50 @@ export function buildToMinimum(
   return { outcome: total >= min.amount ? 'built' : 'built-short', needRatio, lines, steps };
 }
 
-/** Order trigger for a vendor (0–1 of its minimum). */
-export type TriggerLookup = (vendorId: VendorId) => number;
+/** Effective order trigger: player override ?? vendor default ?? rules default. */
+export function effectiveTrigger(state: GameState, vendorId: VendorId, r: Rules = defaultRules): number {
+  return state.vendorTriggers?.[vendorId] ?? state.vendors[vendorId]?.orderTrigger ?? r.vendorMinimum.defaultTrigger;
+}
+
+const STATUS: Record<BuildOutcome, VendorPlan['status']> = {
+  'no-need': 'below-trigger',
+  met: 'meets-minimum',
+  built: 'built',
+  'built-short': 'built',
+  'below-trigger': 'below-trigger',
+};
 
 /**
- * Apply CO-MRP per (vendor, depot) order to today's plan lines. Returns the proposals to show
- * (qty > 0 only; lines grown by the build keep 'must', others become 'vendor-min-fill') and
- * vendor-min-shortfall exceptions for orders held back below the trigger.
+ * Apply CO-MRP per vendor order (all depots ordering from that vendor today). Returns the
+ * proposals to show (qty > 0 only; lines grown by the build keep 'must', others become
+ * 'vendor-min-fill'), one VendorPlan per vendor ordering today, and vendor-min-shortfall
+ * exceptions for orders held back below the trigger.
  */
 export function applyVendorMinimums(
   state: GameState,
   input: readonly PlanLine[],
-  triggerFor: TriggerLookup = () => defaultRules.vendorMin.defaultOrderTrigger,
   r: Rules = defaultRules,
-): { proposals: OrderProposal[]; exceptions: PlanningException[] } {
+): { proposals: OrderProposal[]; vendorPlans: VendorPlan[]; exceptions: PlanningException[] } {
   const proposals: OrderProposal[] = [];
+  const vendorPlans: VendorPlan[] = [];
   const exceptions: PlanningException[] = [];
 
-  const groups = new Map<string, PlanLine[]>();
-  for (const l of input) {
-    const key = `${l.proposal.vendorId}\u0000${l.proposal.depotId}`;
-    groups.set(key, [...(groups.get(key) ?? []), l]);
-  }
+  const groups = new Map<VendorId, PlanLine[]>();
+  for (const l of input) groups.set(l.proposal.vendorId, [...(groups.get(l.proposal.vendorId) ?? []), l]);
 
-  for (const group of groups.values()) {
-    const vendor = state.vendors[group[0].proposal.vendorId];
+  for (const [vendorId, group] of groups) {
+    const vendor = state.vendors[vendorId];
     const min = vendor?.minimum;
+    const trigger = effectiveTrigger(state, vendorId, r);
     if (!min) {
-      proposals.push(...group.map((l) => l.proposal).filter((p) => p.qty > 0));
+      const lines = group.map((l) => l.proposal).filter((p) => p.qty > 0);
+      proposals.push(...lines);
+      vendorPlans.push({ vendorId, need: lines.reduce((s, p) => s + p.cost, 0), trigger, ratio: 1, status: 'no-minimum' });
       continue;
     }
-    const trigger = triggerFor(vendor.id);
     const result = buildToMinimum(
       group.map((l) => ({
-        itemId: l.proposal.itemId,
+        itemId: `${l.proposal.itemId}\u0000${l.proposal.depotId}`,
         qty: l.proposal.reason === 'must' ? l.proposal.qty : 0,
         packSize: l.packSize,
         unitCost: l.unitCost,
@@ -136,26 +146,28 @@ export function applyVendorMinimums(
       trigger,
       r,
     );
+    const need = minimumTotal(group.filter((l) => l.proposal.reason === 'must').map((l) => ({ qty: l.proposal.qty, unitCost: l.unitCost })), min);
+    vendorPlans.push({ vendorId, need, minimum: min.amount, trigger, ratio: result.needRatio, status: STATUS[result.outcome] });
 
-    if (result.outcome === 'below-trigger') {
-      const unit = min.kind === 'value' ? ' silver' : ' units';
-      exceptions.push({
-        kind: 'vendor-min-shortfall',
-        day: state.today,
-        vendorId: vendor.id,
-        depotId: group[0].proposal.depotId,
-        message:
-          `${vendor.name}: must-order need is ${pct(result.needRatio)} of the ${whole(min.amount)}${unit} minimum, ` +
-          `below the ${pct(trigger)} order trigger — no order proposed. Lower the trigger to build up to the minimum.`,
-      });
+    if (result.outcome === 'below-trigger' || result.outcome === 'no-need') {
+      if (result.outcome === 'below-trigger') {
+        const unit = min.kind === 'value' ? ' silver' : ' units';
+        exceptions.push({
+          kind: 'vendor-min-shortfall',
+          day: state.today,
+          vendorId,
+          message:
+            `${vendor.name}: must-order need is ${pct(result.needRatio)} of the ${whole(min.amount)}${unit} minimum, ` +
+            `below the ${pct(trigger)} order trigger — no order proposed. Lower the trigger to build up to the minimum.`,
+        });
+      }
       continue;
     }
     if (result.outcome === 'built-short') {
       exceptions.push({
         kind: 'vendor-min-shortfall',
         day: state.today,
-        vendorId: vendor.id,
-        depotId: group[0].proposal.depotId,
+        vendorId,
         message: `${vendor.name}: could not build the order up to the minimum (no item with demand to add).`,
       });
     }
@@ -166,7 +178,7 @@ export function applyVendorMinimums(
       proposals.push({ ...l.proposal, qty, reason, cost: qty * l.unitCost });
     });
   }
-  return { proposals, exceptions };
+  return { proposals, vendorPlans, exceptions };
 }
 
 function pct(x: number): string {
