@@ -95,9 +95,11 @@ export interface Rules {
   };
   /**
    * §11 market-driven demand. Each day's demand rate = base rate × factor, where
-   * factor = clamp((close[d] ÷ mean(close)) ^ sensitivity, minFactor, maxFactor), then seeded noise.
+   * factor = clamp((close[d] ÷ mean(close))^sensitivity × (1 + returnGain × ln(close[d] ÷ close[d−1])),
+   * minFactor, maxFactor), then seeded noise. The level term is a slow, forecastable drift; the
+   * daily-return term is the unpredictable part, so a more volatile ticker means a worse SWAPE.
    */
-  market: { sensitivity: number; minFactor: number; maxFactor: number };
+  market: { sensitivity: number; returnGain: number; minFactor: number; maxFactor: number };
   /** §11 difficulty: market ticker (volatility) and budget tightness (allowance × budgetFactor). */
   difficulty: Record<Difficulty, { ticker: string; label: string; budgetFactor: number }>;
   /** §9/§11 rank, reprimands, promotions, battles. */
@@ -152,13 +154,14 @@ export const rules: Rules = {
   projection: { measureAtD2: 'before-d2-receipt', lostSales: true },
   forecastError: { window: 14 },
   mustOrderMinOnePack: true,
-  demand: { baseWindow: 28, noiseCv: 0.2 },
+  demand: { baseWindow: 28, noiseCv: 0.1 },
   kpi: { daysOfSupplyHorizon: 7 },
   exceptions: { forecastDeviationPct: 0.3 },
   spoilage: { mode: 'lots' },
   delivery: { lateDaysMin: 1, lateDaysMax: 2 },
   vendorMinimum: { defaultTrigger: 0.5, buildPriority: 'days-of-cover', maxPacks: 10000 },
-  market: { sensitivity: 1.5, minFactor: 0.5, maxFactor: 1.8 },
+  // sensitivity 2, returnGain 6, noiseCv 0.1: sandbox SWAPE ≈ 0.14 easy (KO), 0.18 normal (AAPL), 0.27 hard (TSLA).
+  market: { sensitivity: 2, returnGain: 6, minFactor: 0.5, maxFactor: 1.8 },
   difficulty: {
     easy: { ticker: 'KO', label: 'Garrison duty', budgetFactor: 1.15 },
     normal: { ticker: 'AAPL', label: 'Field campaign', budgetFactor: 1 },

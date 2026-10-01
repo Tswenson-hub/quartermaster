@@ -9,6 +9,7 @@ import type {
   FiscalPeriod,
   GameState,
   GameStatus,
+  ItemLocation,
   Letter,
   LetterKind,
   RankState,
@@ -21,30 +22,43 @@ export interface CareerUpdate {
   status: GameStatus;
 }
 
-/** Days in the campaign. TODO(contract): GameState has no lengthDays; the store's market series has exactly lengthDays values. */
+/** Days in the campaign. */
 export function campaignLength(state: GameState): number {
-  return state.market?.values.length ?? Infinity;
+  return state.lengthDays;
 }
 
 /**
- * Service level to a battle plan's depots over its window.
- * TODO(contract): per-location fulfilment isn't stored, so this uses the daily KPI rows over
- * the window (all locations). Exact once ItemLocation carries fulfilled history.
+ * Service level (fulfilled ÷ demand) over a battle plan's window, for the plan's items
+ * (keys of its stated/actual uplift; every item if it names none) at its depots.
+ * `today` is the morning after the window's last played day: history's last entry is today − 1.
+ * No demand in the window → 1.
  */
-export function battleServiceLevel(plan: BattlePlan, kpis: readonly DailyKpi[]): number {
-  return serviceLevel(kpis.filter((k) => k.day >= plan.start && k.day <= plan.end));
+export function battleServiceLevel(plan: BattlePlan, locations: readonly ItemLocation[], today: Day): number {
+  const items = new Set([...Object.keys(plan.statedUplift), ...Object.keys(plan.actualUplift)]);
+  let demand = 0;
+  let fulfilled = 0;
+  for (const loc of locations) {
+    if (!plan.depotIds.includes(loc.depotId) || (items.size > 0 && !items.has(loc.itemId))) continue;
+    for (let d = Math.max(0, plan.start); d <= plan.end && d < today; d++) {
+      demand += loc.history[loc.history.length - (today - d)] ?? 0;
+      fulfilled += loc.fulfilled?.[d] ?? 0;
+    }
+  }
+  return demand === 0 ? 1 : fulfilled / demand;
 }
 
 /**
  * Career events at the end of day t, in order: fiscal period close (reprimand / merit),
  * battles whose window ended on t, promotion, then demotion below level 0 → game over;
  * otherwise 'complete' once the campaign's last day is played.
- * `kpis` includes day t; `period` is the period that closed on t, if any.
+ * `kpis` and `locations` include day t (history/fulfilled appended); `period` is the period
+ * that closed on t, if any.
  */
 export function updateCareer(
   state: GameState,
   t: Day,
   kpis: readonly DailyKpi[],
+  locations: readonly ItemLocation[],
   period: FiscalPeriod | undefined,
   r: Rules = defaultRules,
 ): CareerUpdate {
@@ -101,7 +115,7 @@ export function updateCareer(
 
   for (const plan of state.battlePlans) {
     if (plan.end !== t) continue;
-    const sl = battleServiceLevel(plan, kpis);
+    const sl = battleServiceLevel(plan, locations, decidedOn);
     const won = sl >= R.battleWinServiceLevel;
     battles.push({ battlePlanId: plan.id, day: decidedOn, won, serviceLevel: sl });
     if (won) {

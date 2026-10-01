@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { actualUplift, baseRate, marketFactor } from '../../src/engine/demand';
-import { rules } from '../../src/engine/rules.config';
+import { rules, type Rules } from '../../src/engine/rules.config';
 import { initGame, tick } from '../../src/engine/tick';
 import type { MarketSignal, Scenario } from '../../src/engine/types';
 import { flat, loc, quietRules as q, state } from './fixtures';
@@ -8,22 +8,39 @@ import { flat, loc, quietRules as q, state } from './fixtures';
 const market = (values: number[]): MarketSignal => ({ ticker: 'T', source: 'snapshot', firstDate: '', lastDate: '', values });
 
 describe('market factor (§11)', () => {
-  it('clamp((close / mean)^1.5, 0.5, 1.8)', () => {
+  // Level term only (returnGain 0), as in the original spec.
+  const level: Rules = { ...rules, market: { ...rules.market, sensitivity: 1.5, returnGain: 0 } };
+
+  it('level term: clamp((close / mean)^1.5, 0.5, 1.8)', () => {
     // values 1, 2, 3 → mean 2: 0.5^1.5 = 0.354 → 0.5; 1^1.5 = 1; 1.5^1.5 = 1.837 → 1.8
     const m = market([1, 2, 3]);
-    expect([0, 1, 2].map((d) => marketFactor(m, d))).toEqual([0.5, 1, 1.8]);
-    expect(marketFactor(market([90, 110]), 1)).toBeCloseTo(1.1 ** 1.5, 12);
+    expect([0, 1, 2].map((d) => marketFactor(m, d, level))).toEqual([0.5, 1, 1.8]);
+    expect(marketFactor(market([90, 110]), 1, level)).toBeCloseTo(1.1 ** 1.5, 12);
+  });
+
+  it('default: (close / mean)^2 × (1 + 6 × daily log return)', () => {
+    // [100, 110, 99]: mean 103; day 0 no return.
+    const m = market([100, 110, 99]);
+    expect(marketFactor(m, 0)).toBeCloseTo((100 / 103) ** 2, 12); // 0.9426
+    expect(marketFactor(m, 1)).toBeCloseTo((110 / 103) ** 2 * (1 + 6 * Math.log(1.1)), 12); // 1.1405 × 1.5719 = 1.7928
+  });
+
+  it('clamped to [0.5, 1.8]', () => {
+    // Day 2: (99/103)^2 × (1 + 6 ln 0.9) = 0.9238 × 0.3678 = 0.34 → 0.5
+    expect(marketFactor(market([100, 110, 99]), 2)).toBe(0.5);
+    expect(marketFactor(market([100, 150]), 1)).toBe(1.8);
   });
 
   it('days past the series reuse the last close; no series → 1', () => {
-    expect(marketFactor(market([1, 2, 3]), 10)).toBe(1.8);
+    expect(marketFactor(market([1, 2, 3]), 10, level)).toBe(1.8);
     expect(marketFactor(market([]), 0)).toBe(1);
     expect(marketFactor(undefined, 0)).toBe(1);
   });
 
   it('drives tick demand: rate 10 × factor (noise off)', () => {
     let s = state({ market: market([1, 2, 3]) });
-    s = tick(tick(tick(s, q), q), q);
+    const r = { ...q, market: level.market };
+    s = tick(tick(tick(s, r), r), r);
     expect(s.kpis.map((k) => k.demand)).toEqual([5, 10, 18]);
   });
 
