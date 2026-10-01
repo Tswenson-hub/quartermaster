@@ -3,7 +3,7 @@ import { KpiPanel } from '../components/KpiPanel';
 import { Panel } from '../components/Panel';
 import { RankBadge } from '../components/RankBadge';
 import { fmtDay } from '../format';
-import { useGame, useGameActions, useLetterTexts, useRank } from '../hooks';
+import { useCampaignDay, useGame, useGameActions, useLetterTexts, useRank } from '../hooks';
 import { useUiStore } from '../uiStore';
 
 /** End of campaign: completed, or dismissed after falling below the lowest rank. */
@@ -11,6 +11,7 @@ export function GameOverScreen({ onReview }: { onReview: () => void }) {
   const game = useGame();
   const rank = useRank();
   const letters = useLetterTexts();
+  const campaign = useCampaignDay();
   const { quitGame } = useGameActions();
   const resetCampaign = useUiStore((s) => s.resetCampaign);
   if (!game || !rank) return null;
@@ -45,7 +46,7 @@ export function GameOverScreen({ onReview }: { onReview: () => void }) {
           <div>
             <div className="muted">Days served</div>
             <div className="game-over-title">
-              {game.today} of {game.lengthDays}
+              {campaign ? `${Math.max(0, game.today - game.startDay)} of ${campaign.total}` : game.today}
             </div>
           </div>
         </div>

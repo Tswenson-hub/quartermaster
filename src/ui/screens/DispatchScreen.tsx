@@ -1,6 +1,7 @@
 import type { ExceptionKind, PlanningException } from '../../engine/types';
 import { ItemIcon } from '../components/ItemIcon';
 import { KpiPanel } from '../components/KpiPanel';
+import { TakeoverNote } from '../components/TakeoverNote';
 import { Panel } from '../components/Panel';
 import { Term } from '../components/Term';
 import { fmtDay, fmtQty } from '../format';
@@ -74,6 +75,7 @@ export function DispatchScreen() {
 
   return (
     <div className="stack">
+    <TakeoverNote />
     <KpiPanel />
     <div className="screen-grid dispatch-grid">
       <Panel

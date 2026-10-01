@@ -1,4 +1,4 @@
-import { useGame, useGameActions, useMarketInfo, useRank, useScenario, useScenarioOver, useServiceLevel, useTreasury } from '../hooks';
+import { useCampaignDay, useGame, useGameActions, useMarketInfo, useRank, useScenario, useScenarioOver, useServiceLevel, useTreasury } from '../hooks';
 import { RankBadge } from './RankBadge';
 import { fmtSilver, weekdayName } from '../format';
 import { useUiStore } from '../uiStore';
@@ -16,6 +16,7 @@ export function TopBar() {
   const go = useUiStore((s) => s.go);
   const rank = useRank();
   const market = useMarketInfo();
+  const campaign = useCampaignDay();
   if (!game) return null;
 
   const morale = Math.round(game.morale);
@@ -46,10 +47,12 @@ export function TopBar() {
 
       <dl className="topbar-stats">
         <div className="stat">
-          <dt>Day</dt>
-          <dd>
+          <dt>
             {weekdayName(game.today)} <span data-testid="today">{game.today}</span>
-            <span className="muted"> / {game.lengthDays}</span>
+          </dt>
+          <dd title={campaign && campaign.inheritedDays > 0 ? `You took command on day ${game.startDay}` : undefined}>
+            Day <span data-testid="campaign-day">{campaign?.day ?? game.today + 1}</span>
+            <span className="muted"> of {campaign?.total ?? game.lengthDays}</span>
           </dd>
         </div>
         <div className="stat">
