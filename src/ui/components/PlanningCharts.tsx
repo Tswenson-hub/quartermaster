@@ -58,9 +58,11 @@ interface Props {
   view: PlanningView;
   unit: string;
   battlePlans: BattlePlan[];
+  /** A distribution centre: demand is the depots' planned transfers (dependent demand). */
+  dc?: boolean;
 }
 
-export function PlanningCharts({ view, unit, battlePlans }: Props) {
+export function PlanningCharts({ view, unit, battlePlans, dc = false }: Props) {
   const { points, params, today, d2CheckDay, overrides } = view;
   const first = points[0]?.day ?? 0;
   const last = points[points.length - 1]?.day ?? 0;
@@ -130,7 +132,15 @@ export function PlanningCharts({ view, unit, battlePlans }: Props) {
 
       <div className="chart-block">
         <div className="chart-title">
-          Daily demand <span className="muted">— actual vs forecast ({unit}s/day)</span>
+          {dc ? (
+            <>
+              Transfers out <span className="muted">— shipped vs planned by the depots ({unit}s/day)</span>
+            </>
+          ) : (
+            <>
+              Daily demand <span className="muted">— actual vs forecast ({unit}s/day)</span>
+            </>
+          )}
         </div>
         <ResponsiveContainer width="100%" height={180}>
           <ComposedChart data={points} syncId="planning" margin={{ top: 8, right: 72, bottom: 0, left: 0 }}>
@@ -151,8 +161,8 @@ export function PlanningCharts({ view, unit, battlePlans }: Props) {
               />
             ))}
             <ReferenceLine x={today} stroke={INK} strokeWidth={2} />
-            <Line name="Actual demand" dataKey="history" stroke={SERIES.history} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false} />
-            <Line name="Forecast" dataKey="forecast" stroke={SERIES.forecast} strokeWidth={2} strokeDasharray="5 3" dot={false} isAnimationActive={false} />
+            <Line name={dc ? 'Transfers shipped' : 'Actual demand'} dataKey="history" stroke={SERIES.history} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false} />
+            <Line name={dc ? 'Planned transfers' : 'Forecast'} dataKey="forecast" stroke={SERIES.forecast} strokeWidth={2} strokeDasharray="5 3" dot={false} isAnimationActive={false} />
             <Legend verticalAlign="top" height={24} iconType="plainline" wrapperStyle={{ fontSize: 12, color: INK }} />
           </ComposedChart>
         </ResponsiveContainer>

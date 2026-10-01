@@ -5,6 +5,7 @@ import { Panel } from '../components/Panel';
 import { Term } from '../components/Term';
 import { fmtDaysOfSupply, fmtOrderDays, fmtPct, fmtQty, fmtSilver } from '../format';
 import { useGameActions, useItemLocationRows, useVendorRows, type ItemLocationRow } from '../hooks';
+import { isDc, isTransferLane } from '../dc';
 import { MOP_CAPTION, mopDriver } from '../mop';
 import { useUiStore } from '../uiStore';
 
@@ -60,6 +61,22 @@ interface Column<R> {
   cell: (r: R) => ReactNode;
 }
 
+function DcTag() {
+  return (
+    <span className="tag tag-dc">
+      <Term k="dc">DC</Term>
+    </span>
+  );
+}
+
+function LaneTag() {
+  return (
+    <span className="tag tag-lane">
+      <Term k="transfer">transfer</Term>
+    </span>
+  );
+}
+
 const driverOf = (r: ItemLocationRow) => mopDriver(r.stats.safetyStock, r.stats.minimumFill);
 
 /** The input that currently sets MOP: bold, with a small tag. */
@@ -89,8 +106,32 @@ const ITEM_COLUMNS: Column<ItemLocationRow>[] = [
       </span>
     ),
   },
-  { key: 'depot', label: 'Depot', text: 'Depot', sort: (r) => r.depot?.name ?? r.stats.depotId, cell: (r) => r.depot?.name ?? r.stats.depotId },
-  { key: 'vendor', label: 'Vendor', text: 'Vendor', sort: (r) => r.vendor?.name ?? '', cell: (r) => r.vendor?.name ?? '—' },
+  {
+    key: 'depot',
+    label: 'Depot',
+    text: 'Depot',
+    sort: (r) => r.depot?.name ?? r.stats.depotId,
+    cell: (r) => (
+      <>
+        {r.depot?.name ?? r.stats.depotId}
+        {isDc(r.depot) && <DcTag />}
+      </>
+    ),
+  },
+  {
+    key: 'vendor',
+    label: 'Vendor',
+    text: 'Vendor',
+    sort: (r) => r.vendor?.name ?? '',
+    cell: (r) =>
+      isTransferLane(r.vendor) ? (
+        <>
+          {r.vendor?.name} <LaneTag />
+        </>
+      ) : (
+        (r.vendor?.name ?? '—')
+      ),
+  },
   { key: 'onHand', label: 'On hand', text: 'On hand', num: true, sort: (r) => r.stats.onHand, cell: (r) => fmtQty(r.stats.onHand) },
   {
     key: 'sales',
@@ -351,12 +392,16 @@ function VendorsTab() {
             {rows.map(({ stats: v, vendor }) => {
               const name = vendor?.name ?? v.vendorId;
               const min = v.minimum;
+              const lane = isTransferLane(vendor);
               return (
-                <tr key={v.vendorId} data-testid="master-vendor-row">
+                <tr key={v.vendorId} data-testid="master-vendor-row" className={lane ? 'lane-row' : undefined}>
                   <td className="cell-item">
                     <span className="item-cell">
                       <VendorTile id={v.vendorId} name={name} size={24} />
-                      <span>{name}</span>
+                      <span>
+                        {name}
+                        {lane && <LaneTag />}
+                      </span>
                     </span>
                   </td>
                   <td data-label="Order days" className="order-days-cell">
@@ -405,7 +450,7 @@ function VendorsTab() {
                     {fmtQty(v.unitsOrdered)}
                   </td>
                   <td className="num" data-label="Spend">
-                    {fmtSilver(v.spend)}
+                    {lane ? <span className="muted">transfer</span> : fmtSilver(v.spend)}
                   </td>
                   <td className="num" data-label="On time">
                     {fmtPct(v.onTimeRate)}
