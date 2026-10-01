@@ -60,7 +60,7 @@ export const BATTLE_PLANS: BattlePlan[] = [
     announcedOn: 42,
     start: 52,
     end: 65,
-    winServiceLevel: 0.9,
+    winServiceLevel: 0.93,
     depotIds: ['northern-pass'],
     statedUplift: { oats: 1.5, horseshoes: 1.5 },
     // The road was ice and scree. Horses ate more in the cold and threw shoes on every switchback.
@@ -92,7 +92,7 @@ export const BATTLE_PLANS: BattlePlan[] = [
     announcedOn: 3,
     start: 14,
     end: 34,
-    winServiceLevel: 0.95,
+    winServiceLevel: 0.98,
     depotIds: ['eastern-camp'],
     // No figures in the letter, so the system forecast gets no uplift. The player must override it.
     statedUplift: {},

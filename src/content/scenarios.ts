@@ -101,6 +101,8 @@ interface DcSpec {
   /** DC opening stock and minimum fill, in days of the lane-served depots' combined mean demand. */
   onHandDays: number;
   minimumFillDays: number;
+  /** Minimum fill at each lane-served front depot, in days of its own mean demand (a buffer against a late convoy). */
+  frontMinimumFillDays: number;
   serviceLevel?: number;
 }
 
@@ -208,7 +210,11 @@ function buildScenario(s: ScenarioSpec): Scenario {
       depotId: l.depotId,
       onHand: Math.round(spec.mean * Math.min(l.onHandDays, (items[l.itemId].shelfLifeDays ?? Infinity) / 2)),
       serviceLevel: l.serviceLevel ?? DEFAULT_SERVICE_LEVEL[items[l.itemId].criticality],
-      minimumFill: l.minimumFill ?? 0,
+      minimumFill:
+        l.minimumFill ??
+        (s.dc?.items.includes(l.itemId) && sourcing.some((r) => r.itemId === l.itemId && VENDORS[r.vendorId]?.dcDepotId && r.depotIds?.includes(l.depotId))
+          ? Math.round(spec.mean * s.dc.frontMinimumFillDays)
+          : 0),
       history: generateHistory(s.seed, l.itemId, l.depotId, spec, HISTORY_DAYS),
     };
   });
@@ -313,7 +319,7 @@ const tutorial: ScenarioSpec[] = [
     seed: 1303,
     lengthDays: 28,
     periodLengthDays: 28,
-    allowanceFactor: 1.1,
+    allowanceFactor: 1.2,
     vendorIds: ['abbey-granary'],
     lines: [
       { itemId: 'grain', depotId: 'harrowmere', demand: { cv: 0.12 }, onHandDays: 7, serviceLevel: 0.95, minimumFill: 30 },
@@ -332,7 +338,7 @@ const tutorial: ScenarioSpec[] = [
     seed: 1404,
     lengthDays: 28,
     periodLengthDays: 28,
-    allowanceFactor: 1.15,
+    allowanceFactor: 1.35,
     vendorIds: ['abbey-granary', 'river-merchants'],
     lines: [
       { itemId: 'ale', depotId: 'eastern-camp', sources: ['abbey-granary'], onHandDays: 5 },
@@ -353,7 +359,7 @@ const tutorial: ScenarioSpec[] = [
     seed: 1505,
     lengthDays: 28,
     periodLengthDays: 28,
-    allowanceFactor: 1.3,
+    allowanceFactor: 1.6,
     vendorIds: ['guild-fletchers'],
     lines: [
       { itemId: 'arrows', depotId: 'northern-pass', demand: { mean: 8 }, onHandDays: 9 },
@@ -396,7 +402,7 @@ const tutorial: ScenarioSpec[] = [
     seed: 1707,
     lengthDays: 35,
     periodLengthDays: 28,
-    allowanceFactor: 1.3,
+    allowanceFactor: 1.6,
     vendorIds: ['abbey-granary', 'river-merchants', 'guild-fletchers', 'royal-armory'],
     lines: [
       { itemId: 'grain', depotId: 'eastern-camp', onHandDays: 6 },
@@ -441,7 +447,7 @@ const tutorial: ScenarioSpec[] = [
     seed: 1909,
     lengthDays: 56,
     periodLengthDays: 28,
-    allowanceFactor: 1.2,
+    allowanceFactor: 1.35,
     vendorIds: ['abbey-granary', 'river-merchants', 'guild-fletchers', 'royal-armory', 'apothecary'],
     lines: [
       // Guild only: level VII already taught fallback sourcing; here the budget is about the letters.
@@ -471,7 +477,7 @@ const tutorial: ScenarioSpec[] = [
     seed: 2010,
     lengthDays: 42,
     periodLengthDays: 28,
-    allowanceFactor: 1.25,
+    allowanceFactor: 1.5,
     vendorIds: ['abbey-granary', 'guild-fletchers', 'apothecary', 'lane-kingsreach-east', 'lane-kingsreach-harrowmere'],
     lines: [
       { itemId: 'grain', depotId: 'eastern-camp', onHandDays: 4 },
@@ -482,7 +488,7 @@ const tutorial: ScenarioSpec[] = [
       { itemId: 'arrows', depotId: 'harrowmere', onHandDays: 5 },
       { itemId: 'bandages', depotId: 'harrowmere', onHandDays: 5 },
     ],
-    dc: { depotId: 'kingsreach-dc', items: ['grain', 'hardtack', 'arrows'], onHandDays: 8, minimumFillDays: 3 },
+    dc: { depotId: 'kingsreach-dc', items: ['grain', 'hardtack', 'arrows'], onHandDays: 8, minimumFillDays: 3, frontMinimumFillDays: 2 },
   },
 ];
 
@@ -515,7 +521,7 @@ const sandbox: ScenarioSpec = {
   battlePlanIds: ['harrowmere-assault', 'feast-muster', 'winter-crossing', 'ford-feint'],
   // Staples flow through Kingsreach to the Eastern Camp and Harrowmere. The Northern Pass, and
   // everything perishable, medical or for the siege train, still goes direct to the front.
-  dc: { depotId: 'kingsreach-dc', items: ['grain', 'hardtack', 'salt-pork', 'oats', 'arrows'], onHandDays: 7, minimumFillDays: 3 },
+  dc: { depotId: 'kingsreach-dc', items: ['grain', 'hardtack', 'salt-pork', 'oats', 'arrows'], onHandDays: 7, minimumFillDays: 5, frontMinimumFillDays: 2 },
 };
 
 export const TUTORIAL_SCENARIOS: Scenario[] = tutorial.map(buildScenario);
