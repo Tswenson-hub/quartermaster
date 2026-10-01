@@ -58,6 +58,7 @@ export function initGame(scenario: Scenario, setup?: GameSetup, r: Rules = defau
   const state: GameState = {
     ...initial,
     today: 0,
+    lengthDays: scenario.lengthDays,
     periods,
     openOrders: openOrders ?? [],
     proposals: [],

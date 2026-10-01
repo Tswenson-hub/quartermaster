@@ -19,11 +19,11 @@ Proposed changes to `src/engine/types.ts`. Lead records the decision under each 
    (tutorial-3 99.5%, tutorial-4 99.3%, tutorial-7 97.8%, sandbox 98.2%; all still ≥ 95%). Safety stock covers forecast error only.
    If the product owner wants RELEX-style LT-variance safety stock, `rules.safetyStock` would need reliability/lateDays inputs.
 
-## Open (engine, M2 rank)
-8. **`GameState.lengthDays`** — tick needs the campaign length to set `status: 'complete'`. Today the engine uses
+## Resolved 2026-09-30, round 3
+8. **`GameState.lengthDays`** — added (RuntimeField; initGame sets it; lead patched initGame + test fixture). Engine: use it in campaignLength(). Original request: — tick needs the campaign length to set `status: 'complete'`. Today the engine uses
    `state.market.values.length` (the store guarantees it equals `scenario.lengthDays`), see `campaignLength()` in `rank.ts`.
    Proposal: copy `scenario.lengthDays` into `GameState.lengthDays` in initGame (RuntimeField).
-9. **Per-location fulfilment for battles** — `BattleOutcome.serviceLevel` should be service to the battle plan's depots, but only
+9. **Per-location fulfilment** — added as optional `ItemLocation.fulfilled?: number[]` (campaign days; tick appends). Original request: `BattleOutcome.serviceLevel` should be service to the battle plan's depots, but only
    all-location `DailyKpi` rows are stored, so `battleServiceLevel()` uses those over the window. Proposal: `ItemLocation.fulfilled:
    number[]`, parallel to the campaign part of `history` (tick appends units fulfilled each day). Then battles (and per-item service
    level in the UI) can be exact. Engine change is local to `rank.ts` + `tick.ts`.

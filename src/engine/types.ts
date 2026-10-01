@@ -96,6 +96,11 @@ export interface ItemLocation {
    */
   lots?: { qty: number; receivedOn: Day }[];
   /**
+   * Units fulfilled each campaign day, oldest first: fulfilled[d] is day d. Parallel to the campaign
+   * part of `history`. tick appends; absent until the first tick. Used for per-depot battle outcomes.
+   */
+  fulfilled?: number[];
+  /**
    * Actual daily demand, oldest first; the last entry is always yesterday (today − 1).
    * Scenarios seed it with pre-campaign history; tick() appends each day's actual demand.
    * So the demand on day d is history[history.length - (today - d)].
@@ -313,6 +318,8 @@ export type GameStatus = 'playing' | 'complete' | 'lost';
 export interface GameState {
   seed: number;
   today: Day;
+  /** Campaign length (scenario.lengthDays). today ≥ lengthDays → status 'complete'. */
+  lengthDays: number;
   items: Record<ItemId, Item>;
   vendors: Record<VendorId, Vendor>;
   depots: Record<DepotId, Depot>;
@@ -342,6 +349,7 @@ export interface GameState {
 /** GameState fields built by initGame, not provided by scenarios. */
 export type RuntimeField =
   | 'today'
+  | 'lengthDays'
   | 'proposals'
   | 'exceptions'
   | 'kpis'
