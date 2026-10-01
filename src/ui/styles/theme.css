@@ -1196,6 +1196,19 @@ input.edited {
 .seg-good {
   background: var(--good);
 }
+.seg-inherited {
+  background: repeating-linear-gradient(135deg, #8a7a62 0 4px, #a8977c 4px 8px);
+}
+.wagons-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+}
+.wagons-scroll thead th {
+  position: sticky;
+  top: 0;
+  background: var(--parchment);
+  z-index: 1;
+}
 .seg-pending {
   background: repeating-linear-gradient(45deg, #9fb6da 0 4px, #c9d6ea 4px 8px);
 }

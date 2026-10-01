@@ -311,6 +311,8 @@ export interface TreasuryView {
   periods: FiscalPeriod[];
   /** What ending the day now would spend (engine preview, excl. dropped lines). */
   pendingToday: number;
+  /** Part of the current period's committed spend made by the previous quartermaster (before startDay). */
+  inheritedCommitted: number;
   remaining: number;
 }
 
@@ -322,7 +324,15 @@ export function useTreasury(): TreasuryView | null {
     const period = selectCurrentPeriod(game);
     const pendingToday = preview?.spend ?? 0;
     const remaining = period ? period.allowance - period.committed - pendingToday : 0;
-    return { period, periods: game.periods, pendingToday, remaining };
+    // A period that began before takeover already carries the predecessor's orders (spend commits on order day).
+    const inheritedCommitted =
+      period && period.start < game.startDay
+        ? Math.min(
+            period.committed,
+            game.kpis.filter((k) => k.day >= period.start && k.day < game.startDay).reduce((a, k) => a + k.spend, 0),
+          )
+        : 0;
+    return { period, periods: game.periods, pendingToday, remaining, inheritedCommitted };
   }, [game, preview]);
 }
 

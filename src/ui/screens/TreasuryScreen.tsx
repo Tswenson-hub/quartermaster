@@ -32,17 +32,32 @@ export function TreasuryScreen() {
               max={Math.max(p.allowance, p.committed + t.pendingToday) * 1.05}
               markers={[{ value: p.allowance, label: `Allowance ${fmtSilver(p.allowance)}` }]}
               segments={[
-                { value: p.committed, className: 'seg-accepted', label: `Committed ${fmtSilver(p.committed)}` },
+                ...(t.inheritedCommitted > 0
+                  ? [{ value: t.inheritedCommitted, className: 'seg-inherited', label: `Committed by your predecessor ${fmtSilver(t.inheritedCommitted)}` }]
+                  : []),
+                { value: p.committed - t.inheritedCommitted, className: 'seg-accepted', label: `Committed by you ${fmtSilver(p.committed - t.inheritedCommitted)}` },
                 { value: t.pendingToday, className: 'seg-pending', label: `Accepted today ${fmtSilver(t.pendingToday)}` },
               ]}
               caption={
                 <>
-                  <span className="legend-chip seg-accepted" /> <Term k="committed">committed</Term> {fmtSilver(p.committed)}
+                  {t.inheritedCommitted > 0 && (
+                    <>
+                      <span className="legend-chip seg-inherited" /> your predecessor {fmtSilver(t.inheritedCommitted)}
+                    </>
+                  )}
+                  <span className="legend-chip seg-accepted" /> <Term k="committed">committed</Term>
+                  {t.inheritedCommitted > 0 ? ' by you' : ''} {fmtSilver(p.committed - t.inheritedCommitted)}
                   <span className="legend-chip seg-pending" /> accepted today {fmtSilver(t.pendingToday)}
                   <span className="legend-chip marker" /> allowance {fmtSilver(p.allowance)}
                 </>
               }
             />
+            {t.inheritedCommitted > 0 && (
+              <p className="muted small">
+                This period began before you took command: {fmtSilver(t.inheritedCommitted)} was already promised to merchants by
+                your predecessor and counts against the same allowance.
+              </p>
+            )}
             <p className={`treasury-left ${t.remaining < 0 ? 'bad-text' : ''}`}>
               {t.remaining >= 0 ? `${fmtSilver(t.remaining)} remain in the chest.` : `Overspent by ${fmtSilver(-t.remaining)}!`}
             </p>
@@ -74,9 +89,12 @@ export function TreasuryScreen() {
           )}
         </Panel>
 
-        <Panel title="Wagons on the road" flavour="Paid for, not yet arrived. Transfers from a DC cost nothing against the budget.">
+        <Panel
+          title={`Wagons on the road (${transit.length})`}
+          flavour="Paid for, not yet arrived. Transfers from a DC cost nothing against the budget."
+        >
           {transit.length ? (
-            <div className="table-scroll">
+            <div className="table-scroll wagons-scroll">
               <table className="simple-table">
                 <thead>
                   <tr>
@@ -89,7 +107,10 @@ export function TreasuryScreen() {
                 <tbody>
                   {transit.map((o) => (
                     <tr key={o.id}>
-                      <td className="nowrap">{fmtDay(o.deliveryOn)}</td>
+                      <td className="nowrap">
+                        {fmtDay(o.deliveryOn)}
+                        {o.deliveryOn === game.today && <span className="muted small"> today</span>}
+                      </td>
                       <td>
                         {game.items[o.itemId]?.name}
                         <span className="muted"> · {game.vendors[o.vendorId]?.name}</span>
