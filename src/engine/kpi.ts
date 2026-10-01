@@ -1,4 +1,5 @@
 // KPIs (docs/RELEX_RULES.md §10): service level, days of supply, spoilage, SWAPE, bias.
+import { isDc } from './dc';
 import { forecastLocation } from './forecast';
 import { rules as defaultRules, type Rules } from './rules.config';
 import type { DailyKpi, GameState, ItemLocation } from './types';
@@ -49,12 +50,14 @@ export function daysOfSupply(state: GameState, loc: ItemLocation, r: Rules = def
 
 /**
  * Days of supply over all locations (§10): Σ on hand ÷ Σ mean daily forecast — not a mean of
- * per-location ratios, so one near-zero forecast can't dominate.
+ * per-location ratios, so one near-zero forecast can't dominate. DC stock counts in the
+ * numerator, but DC (dependent) demand doesn't in the denominator: it would double-count the
+ * front depots' demand.
  */
 export function totalDaysOfSupply(state: GameState, r: Rules = defaultRules): number {
   return coverDays(
     sum(state.locations.map((l) => l.onHand)),
-    sum(state.locations.map((l) => meanDailyForecast(state, l, state.today, r))),
+    sum(state.locations.filter((l) => !isDc(state, l.depotId)).map((l) => meanDailyForecast(state, l, state.today, r))),
   );
 }
 

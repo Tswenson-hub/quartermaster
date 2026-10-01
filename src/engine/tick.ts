@@ -2,7 +2,8 @@
 import { effectiveVendor, nextOrderDayFrom } from './calendar';
 import { baselineFromHistory, forecastLocation } from './forecast';
 import { projectLocation } from './projection';
-import { generatePlanLines, roundToPack } from './replenishment';
+import { appliesTo, generatePlanLines, roundToPack } from './replenishment';
+import { isDc } from './dc';
 import { actualDemand } from './demand';
 import { coverDays, meanDailyForecast } from './kpi';
 import { updateCareer } from './rank';
@@ -27,6 +28,7 @@ import { applyVendorMinimums } from './vendorMin';
 /** Exceptions describing what happened during the last tick; refresh() keeps them. */
 const EVENT_KINDS: ReadonlySet<ExceptionKind> = new Set([
   'stockout',
+  'dc-short',
   'spoilage',
   'forecast-deviation',
   'delivery-late',
@@ -131,7 +133,7 @@ export function initGame(scenario: Scenario, setup?: GameSetup, r: Rules = defau
 function earliestDelivery(state: GameState, loc: ItemLocation): Day | undefined {
   let best: Day | undefined;
   for (const s of state.sourcing) {
-    if (s.itemId !== loc.itemId) continue;
+    if (!appliesTo(s, loc.itemId, loc.depotId)) continue;
     const v = effectiveVendor(state, s.vendorId);
     if (!v) continue;
     const d = nextOrderDayFrom(v, state.today) + v.leadTimeDays;
@@ -201,6 +203,9 @@ export function refresh(state: GameState, r: Rules = defaultRules): GameState {
  */
 export function placeOrders(state: GameState, decisions: ProposalDecisionInput[], r: Rules = defaultRules): GameState {
   const newOrders: OpenOrder[] = [];
+  const shortages: PlanningException[] = [];
+  // Transfers ship from DC stock at placement, so DC locations may change here.
+  const locations = [...state.locations];
   let seq = state.openOrders.length;
   for (const d of decisions) {
     if (d.decision !== 'accepted') continue;
@@ -209,8 +214,36 @@ export function placeOrders(state: GameState, decisions: ProposalDecisionInput[]
     const vendor = state.vendors[p.vendorId];
     const source = state.sourcing.find((s) => s.itemId === p.itemId && s.vendorId === p.vendorId);
     if (!vendor || !source) continue;
-    const qty = roundToPack(d.qty ?? p.qty, source.packSize, r);
+    let qty = roundToPack(d.qty ?? p.qty, source.packSize, r);
     if (qty <= 0) continue;
+    const transfer = vendor.dcDepotId !== undefined;
+    if (transfer) {
+      // A transfer ships min(qty, DC on hand), oldest lots first; a short ship raises dc-short.
+      const i = locations.findIndex((l) => l.itemId === p.itemId && l.depotId === vendor.dcDepotId);
+      const dc = i >= 0 ? locations[i] : undefined;
+      const ship = Math.max(0, Math.min(qty, dc?.onHand ?? 0));
+      if (ship < qty) {
+        const unit = state.items[p.itemId]?.unit ?? 'units';
+        shortages.push({
+          kind: 'dc-short',
+          day: state.today,
+          itemId: p.itemId,
+          depotId: p.depotId,
+          vendorId: vendor.id,
+          message:
+            `${state.depots[vendor.dcDepotId!]?.name ?? vendor.dcDepotId} could ship only ${whole(ship)} of ${whole(qty)} ${unit} ` +
+            `to ${state.depots[p.depotId]?.name ?? p.depotId}; ${whole(qty - ship)} short.`,
+        });
+      }
+      if (dc && ship > 0) {
+        const perishable = (state.items[dc.itemId]?.shelfLifeDays ?? 0) > 0;
+        const next: ItemLocation = { ...dc, onHand: dc.onHand - ship };
+        if (dc.lots || perishable) next.lots = consume(lotsOf(dc, state.today), ship).lots;
+        locations[i] = next;
+      }
+      qty = ship;
+      if (qty <= 0) continue;
+    }
     newOrders.push({
       id: `o${state.today}-${seq++}-${p.itemId}-${p.depotId}-${p.vendorId}`,
       itemId: p.itemId,
@@ -220,16 +253,26 @@ export function placeOrders(state: GameState, decisions: ProposalDecisionInput[]
       orderedOn: state.today,
       deliveryOn: state.today + vendor.leadTimeDays,
       promisedOn: state.today + vendor.leadTimeDays,
-      cost: qty * source.unitCost,
+      // Transfers cost nothing against the budget.
+      cost: transfer ? 0 : qty * source.unitCost,
     });
   }
   const placed = newOrders;
-  if (placed.length === 0) return state;
+  if (placed.length === 0 && shortages.length === 0) return state;
 
   const spend = placed.reduce((s, o) => s + o.cost, 0);
   const period = periodFor(state.periods, state.today);
   const periods = state.periods.map((p) => (p === period ? { ...p, committed: p.committed + spend } : p));
-  return refresh({ ...state, openOrders: [...state.openOrders, ...placed], periods }, r);
+  return refresh(
+    {
+      ...state,
+      locations,
+      openOrders: [...state.openOrders, ...placed],
+      periods,
+      exceptions: [...state.exceptions, ...shortages],
+    },
+    r,
+  );
 }
 
 /**
@@ -299,8 +342,16 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
       .reduce((s, o) => s + o.qty, 0);
     let stock = loc.onHand + received;
 
-    const forecastToday = forecastLocation(state, loc, t, t, r)[0].total;
-    const demand = actualDemand(state, loc, t, rng, r);
+    const dc = isDc(state, loc.depotId);
+    const forecastToday = dc ? 0 : forecastLocation(state, loc, t, t, r)[0].total;
+    // A DC has no consumption of its own (one normal is still drawn, keeping the RNG stream per location).
+    const demand = dc ? (rng.normal(), 0) : actualDemand(state, loc, t, rng, r);
+    // A DC's "sales" are the transfers it shipped today (placed today against its lanes).
+    const shipped = dc
+      ? state.openOrders
+          .filter((o) => o.orderedOn === t && o.itemId === loc.itemId && state.vendors[o.vendorId]?.dcDepotId === loc.depotId)
+          .reduce((s, o) => s + o.qty, 0)
+      : 0;
 
     const useLots = item?.shelfLifeDays !== undefined && item.shelfLifeDays > 0 && r.spoilage.mode === 'lots';
     let lots = useLots || loc.lots ? addLot(lotsOf(loc, t), received, t) : undefined;
@@ -352,21 +403,24 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
       });
     }
 
-    kpi.forecast += forecastToday;
-    kpi.absError += Math.abs(demand - forecastToday);
+    // Army KPIs (service, forecast accuracy) cover front depots; DC stock counts toward days of supply.
+    if (!dc) {
+      kpi.forecast += forecastToday;
+      kpi.absError += Math.abs(demand - forecastToday);
+      forecastSum += meanDailyForecast(state, loc, t + 1, r);
+    }
     stockSum += stock;
-    forecastSum += meanDailyForecast(state, loc, t + 1, r);
     kpi.demand += demand;
     kpi.fulfilled += fulfilled;
     kpi.spoiled += spoiled;
-    kpi.holdingCost += stock * (item?.holdingCost ?? 0);
+    kpi.holdingCost += stock * (item?.holdingCost ?? 0) * (dc ? r.dc.holdingCostFactor : 1);
     // fulfilled[d] is campaign day d; a location without it (older save) is back-filled as fully served.
     const pastFulfilled = loc.fulfilled ?? loc.history.slice(loc.history.length - t);
     const next: ItemLocation = {
       ...loc,
       onHand: stock,
-      history: [...loc.history, demand],
-      fulfilled: [...pastFulfilled, fulfilled],
+      history: [...loc.history, dc ? shipped : demand],
+      fulfilled: [...pastFulfilled, dc ? shipped : fulfilled],
     };
     if (lots) next.lots = lots;
     return next;
@@ -417,7 +471,11 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
     letters: [...state.letters, ...career.letters],
     battles: [...state.battles, ...career.battles],
     status: career.status,
-    exceptions: events.filter((e) => EVENT_KINDS.has(e.kind)),
+    // dc-short is raised when orders are placed this morning; keep it through the night's tick.
+    exceptions: [
+      ...state.exceptions.filter((e) => e.kind === 'dc-short' && e.day === t),
+      ...events.filter((e) => EVENT_KINDS.has(e.kind)),
+    ],
   };
   const refreshed = refresh(next, r);
   // Keep period-close notices (refresh only re-derives over-budget for the open period).
