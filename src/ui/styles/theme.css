@@ -211,11 +211,13 @@ input {
   font-size: 15px;
   line-height: 1.4;
 }
-.btn-accept.on {
+.btn-accept.on,
+.btn-accept.on:hover:not(:disabled) {
   background: var(--good);
   color: #fff;
 }
-.btn-reject.on {
+.btn-reject.on,
+.btn-reject.on:hover:not(:disabled) {
   background: var(--bad);
   color: #fff;
 }
