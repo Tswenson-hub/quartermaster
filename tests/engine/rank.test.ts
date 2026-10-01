@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { rules } from '../../src/engine/rules.config';
 import { tick } from '../../src/engine/tick';
 import type { BattlePlan, GameState, RankState } from '../../src/engine/types';
-import { loc, quietRules as q, state } from './fixtures';
+import { item, loc, quietRules as q, state } from './fixtures';
 
 const rank = (extra: Partial<RankState> = {}): RankState => ({ level: 2, merit: 0, reprimands: 0, overspentStreak: 0, ...extra });
 // Period 0 is just day 0, so it closes on the first tick.
@@ -82,6 +82,21 @@ describe('battles', () => {
     expect(s.letters).toEqual([expect.objectContaining({ id: 'L1-1-battle-won-ford', kind: 'battle-won', battlePlanId: 'ford' })]);
   });
 
+  it('only the battle plan\'s items at its depots count', () => {
+    // Grain (in the plan) fully served; salt (not in the plan) and a grain at another depot run dry.
+    const s = tick(
+      state({
+        items: { grain: item('grain'), salt: item('salt') },
+        sourcing: [],
+        locations: [loc('grain'), loc('salt', { onHand: 0 }), loc('grain', { depotId: 'north', onHand: 0 })],
+        battlePlans: [battle()],
+      }),
+      q,
+    );
+    expect(s.battles[0]).toMatchObject({ won: true, serviceLevel: 1 });
+    expect(s.locations.map((l) => l.fulfilled)).toEqual([[20], [0], [0]]);
+  });
+
   it('lost: 15 of 20 = 75% < 90% → down one level', () => {
     const s = tick(state({ battlePlans: [battle()], locations: [loc('grain', { onHand: 15 })] }), q);
     expect(s.battles).toEqual([{ battlePlanId: 'ford', day: 1, won: false, serviceLevel: 0.75 }]);
@@ -107,8 +122,8 @@ describe('game status', () => {
     expect(tick(s, q)).toBe(s);
   });
 
-  it("'complete' after the last campaign day (market series length)", () => {
-    let s = state({ market: { ticker: 'T', source: 'snapshot', firstDate: '', lastDate: '', values: [1, 1, 1] } });
+  it("'complete' after the last campaign day (lengthDays)", () => {
+    let s = state({ lengthDays: 3 });
     s = tick(tick(s, q), q);
     expect(s.status).toBe('playing');
     s = tick(s, q);

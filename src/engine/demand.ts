@@ -7,17 +7,22 @@ import type { Day, GameState, ItemLocation, MarketSignal } from './types';
 const mean = (xs: readonly number[]) => (xs.length === 0 ? 0 : xs.reduce((a, b) => a + b, 0) / xs.length);
 
 /**
- * Market factor for game day `day`: clamp((close[day] ÷ mean(close))^sensitivity, min, max).
- * Days past the series reuse the last close. No usable series → 1.
+ * Market factor for game day `day` (see rules.market):
+ * clamp((close[d] ÷ mean)^sensitivity × (1 + returnGain × ln(close[d] ÷ close[d−1])), min, max).
+ * Day 0 has no return. Days past the series reuse the last close. No usable series → 1.
  */
 export function marketFactor(market: MarketSignal | undefined, day: Day, r: Rules = defaultRules): number {
   const values = market?.values ?? [];
   if (values.length === 0) return 1;
   const avg = mean(values);
   if (!(avg > 0)) return 1;
-  const close = values[Math.min(Math.max(0, day), values.length - 1)];
-  const { sensitivity, minFactor, maxFactor } = r.market;
-  return Math.min(maxFactor, Math.max(minFactor, (close / avg) ** sensitivity));
+  const at = (d: number) => values[Math.min(Math.max(0, d), values.length - 1)];
+  const close = at(day);
+  const prev = at(day - 1);
+  const dailyReturn = day > 0 && prev > 0 && close > 0 ? Math.log(close / prev) : 0;
+  const { sensitivity, returnGain, minFactor, maxFactor } = r.market;
+  const factor = (close / avg) ** sensitivity * (1 + returnGain * dailyReturn);
+  return Math.min(maxFactor, Math.max(minFactor, factor));
 }
 
 /**

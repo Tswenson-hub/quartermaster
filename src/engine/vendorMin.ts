@@ -106,7 +106,7 @@ const STATUS: Record<BuildOutcome, VendorPlan['status']> = {
 /**
  * Apply CO-MRP per vendor order (all depots ordering from that vendor today). Returns the
  * proposals to show (qty > 0 only; lines grown by the build keep 'must', others become
- * 'vendor-min-fill'), one VendorPlan per vendor ordering today, and vendor-min-shortfall
+ * 'vendor-min-fill'; builtQty = units added by the build, 0 when none), one VendorPlan per vendor ordering today, and vendor-min-shortfall
  * exceptions for orders held back below the trigger.
  */
 export function applyVendorMinimums(
@@ -126,7 +126,7 @@ export function applyVendorMinimums(
     const min = vendor?.minimum;
     const trigger = effectiveTrigger(state, vendorId, r);
     if (!min) {
-      const lines = group.map((l) => l.proposal).filter((p) => p.qty > 0);
+      const lines = group.map((l) => ({ ...l.proposal, builtQty: 0 })).filter((p) => p.qty > 0);
       proposals.push(...lines);
       vendorPlans.push({ vendorId, need: lines.reduce((s, p) => s + p.cost, 0), trigger, ratio: 1, status: 'no-minimum' });
       continue;
@@ -174,8 +174,16 @@ export function applyVendorMinimums(
     group.forEach((l, i) => {
       const qty = result.lines[i].qty;
       if (qty <= 0) return;
-      const reason = l.proposal.reason === 'must' ? 'must' : 'vendor-min-fill';
-      proposals.push({ ...l.proposal, qty, reason, cost: qty * l.unitCost });
+      const must = l.proposal.reason === 'must';
+      // builtQty: units the trigger build added beyond the line's real (pack-rounded) need.
+      const realNeed = must ? l.proposal.qty : 0;
+      proposals.push({
+        ...l.proposal,
+        qty,
+        builtQty: qty - realNeed,
+        reason: must ? 'must' : 'vendor-min-fill',
+        cost: qty * l.unitCost,
+      });
     });
   }
   return { proposals, vendorPlans, exceptions };
