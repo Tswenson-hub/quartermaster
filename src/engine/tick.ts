@@ -19,7 +19,12 @@ import type {
 import { applyVendorMinimums } from './vendorMin';
 
 /** Exceptions describing what happened during the last tick; refresh() keeps them. */
-const EVENT_KINDS: ReadonlySet<ExceptionKind> = new Set(['spoilage', 'forecast-deviation', 'delivery-late']);
+const EVENT_KINDS: ReadonlySet<ExceptionKind> = new Set([
+  'stockout',
+  'spoilage',
+  'forecast-deviation',
+  'delivery-late',
+]);
 
 export function periodFor(periods: readonly FiscalPeriod[], day: Day): FiscalPeriod | undefined {
   return periods.find((p) => p.start <= day && day <= p.end);
@@ -162,7 +167,7 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
   const rng = rngForDay(state.seed, t);
   const events: PlanningException[] = [];
   let morale = state.morale;
-  const kpi = { day: t, demand: 0, fulfilled: 0, spoiled: 0, holdingCost: 0, spend: 0 };
+  const kpi = { day: t, demand: 0, fulfilled: 0, spoiled: 0, holdingCost: 0, spend: 0, forecast: 0 };
 
   for (const o of state.openOrders) if (o.orderedOn === t) kpi.spend += o.cost;
   const openOrders = state.openOrders.filter((o) => o.deliveryOn > t);
@@ -204,6 +209,15 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
         message: `Actual demand ${demand} vs forecast ${round2(forecastToday)}.`,
       });
     }
+    if (short > 0) {
+      events.push({
+        kind: 'stockout',
+        day: t,
+        itemId: loc.itemId,
+        depotId: loc.depotId,
+        message: `Ran out: ${short} of ${demand} ${item?.unit ?? 'units'} demanded went unmet.`,
+      });
+    }
     if (spoiled > 0) {
       events.push({
         kind: 'spoilage',
@@ -214,6 +228,7 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
       });
     }
 
+    kpi.forecast += forecastToday;
     kpi.demand += demand;
     kpi.fulfilled += fulfilled;
     kpi.spoiled += spoiled;
