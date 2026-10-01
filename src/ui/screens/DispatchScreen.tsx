@@ -28,7 +28,9 @@ export function DispatchScreen() {
   const earlier = game.exceptions.filter((e) => e.day < game.today).sort((a, b) => b.day - a.day).slice(0, 8);
   const arrivals = game.openOrders.filter((o) => o.deliveryOn === game.today + 1);
   const letters = game.battlePlans.filter((b) => b.announcedOn === game.today);
-  const sorted = [...today].sort((a, b) => SEVERITY_RANK[KIND[a.kind].severity] - SEVERITY_RANK[KIND[b.kind].severity]);
+  const byKind = new Map<ExceptionKind, PlanningException[]>();
+  for (const e of today) byKind.set(e.kind, [...(byKind.get(e.kind) ?? []), e]);
+  const groups = [...byKind].sort(([a], [b]) => SEVERITY_RANK[KIND[a].severity] - SEVERITY_RANK[KIND[b].severity]);
 
   const act = (e: PlanningException) => {
     if (e.itemId && e.depotId) planItem(e.itemId, e.depotId);
@@ -75,8 +77,18 @@ export function DispatchScreen() {
         }
         flavour="Messengers wait outside the tent. Deal with the worst news first."
       >
-        {sorted.length ? (
-          <ul className="dispatch-list">{sorted.map(row)}</ul>
+        {groups.length ? (
+          groups.map(([kind, list], gi) => (
+            <details key={kind} className="dispatch-group" open={gi === 0 || list.length <= 3}>
+              <summary>
+                <span className={`sev-badge sev-${KIND[kind].severity}`} aria-hidden>
+                  {SEVERITY_ICON[KIND[kind].severity]}
+                </span>
+                <strong>{KIND[kind].label}</strong> <span className="muted">× {list.length}</span>
+              </summary>
+              <ul className="dispatch-list">{list.map(row)}</ul>
+            </details>
+          ))
         ) : (
           <p className="empty">No riders this morning. All stores stand above their Must Order Points.</p>
         )}

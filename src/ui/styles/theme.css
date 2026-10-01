@@ -602,6 +602,31 @@ input {
   font-size: 13px;
   white-space: nowrap;
 }
+.dispatch-group {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 10px;
+}
+.dispatch-group > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-bottom: 6px;
+  list-style: none;
+}
+.dispatch-group > summary::-webkit-details-marker {
+  display: none;
+}
+.dispatch-group > summary::after {
+  content: '▸';
+  margin-left: auto;
+  transition: transform 0.1s;
+}
+.dispatch-group[open] > summary::after {
+  transform: rotate(90deg);
+}
 .dispatch-earlier {
   margin-top: 14px;
   position: relative;
@@ -640,12 +665,36 @@ input {
 }
 
 /* ------------------------------------------------------------------ planning */
+.ledger {
+  position: sticky;
+  top: 90px;
+}
+.ledger-scroll {
+  max-height: calc(100vh - 210px);
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
+  margin-right: -8px;
+  padding-right: 8px;
+}
+.ledger-depot + .ledger-depot {
+  margin-top: 10px;
+}
+.ledger-depot-name {
+  font-size: 16px;
+  color: var(--ink-soft);
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 2px;
+  margin-bottom: 4px;
+  position: sticky;
+  top: 0;
+  background: var(--parchment);
+  z-index: 1;
+}
 .ledger-list {
   list-style: none;
   padding: 0;
   margin: 0;
-  position: relative;
-  z-index: 1;
 }
 .ledger-row {
   display: flex;
@@ -669,19 +718,12 @@ input {
 .ledger-name {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
   line-height: 1.2;
-}
-.ledger-name .muted {
-  font-size: 12px;
 }
 .ledger-qty {
   font-variant-numeric: tabular-nums;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
+  min-width: 3ch;
+  text-align: right;
 }
 .item-heading {
   display: inline-flex;
@@ -1191,13 +1233,11 @@ input.edited {
   .planning-grid {
     grid-template-columns: 1fr;
   }
-  .ledger-list {
-    display: flex;
-    overflow-x: auto;
-    gap: 4px;
+  .ledger {
+    position: static;
   }
-  .ledger-row {
-    min-width: 200px;
+  .ledger-scroll {
+    max-height: 260px;
   }
 }
 
