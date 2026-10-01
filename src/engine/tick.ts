@@ -54,24 +54,28 @@ export function warmupDays(scenario: Scenario, r: Rules = defaultRules): number 
   return w;
 }
 
-function buildPeriods(scenario: Scenario): FiscalPeriod[] {
+/**
+ * Fiscal periods from day 0 over `totalDays` (warm-up + campaign): periodLengthDays each at
+ * periodAllowance, a final period cut short getting a pro-rated allowance (same rule as content).
+ */
+function buildPeriods(scenario: Scenario, totalDays: number): FiscalPeriod[] {
   const len = Math.max(1, scenario.periodLengthDays);
-  const count = Math.max(1, Math.ceil(scenario.lengthDays / len));
-  return Array.from({ length: count }, (_, index) => ({
-    index,
-    start: index * len,
-    end: index * len + len - 1,
-    allowance: scenario.periodAllowance,
-    committed: 0,
-  }));
+  const periods: FiscalPeriod[] = [];
+  for (let start = 0, index = 0; start < Math.max(1, totalDays); start += len, index++) {
+    const end = Math.min(start + len, Math.max(1, totalDays)) - 1;
+    const allowance = end - start + 1 === len ? scenario.periodAllowance : Math.round((scenario.periodAllowance * (end - start + 1)) / len / 10) * 10;
+    periods.push({ index, start, end, allowance, committed: 0 });
+  }
+  return periods;
 }
 
 /**
  * Build the game and play the warm-up: for W = warmupDays(scenario) days the previous
  * quartermaster accepts every proposal (placeOrders, then tick). KPIs, deliveries and spend
- * accumulate; rank, letters and battles don't (tick skips career before startDay). Content's
- * battle-plan days and fiscal periods are relative to takeover, so both shift by W. The player
- * takes command on day W = startDay; lengthDays = W + scenario.lengthDays.
+ * accumulate; rank, letters and battles don't (tick skips career before startDay, so periods
+ * that end during the warm-up earn no reprimand or merit; the period the player takes over in is
+ * judged normally). Content's battle-plan days are relative to takeover and shift by W; fiscal
+ * periods run from day 0. The player takes command on day W = startDay; lengthDays = W + length.
  */
 export function initGame(scenario: Scenario, setup?: GameSetup, r: Rules = defaultRules): GameState {
   const { openOrders, rankLevel, ...initial } = scenario.initial;
@@ -79,12 +83,10 @@ export function initGame(scenario: Scenario, setup?: GameSetup, r: Rules = defau
   const difficulty = setup?.difficulty ?? 'normal';
   // §11 difficulty: budget tightness scales every period's allowance.
   const budgetFactor = r.difficulty[difficulty].budgetFactor;
-  const periods = (initial.periods.length > 0 ? initial.periods : buildPeriods(scenario)).map((p) => ({
-    ...p,
-    start: p.start + W,
-    end: p.end + W,
-    allowance: p.allowance * budgetFactor,
-  }));
+  // Periods run from day 0, so the warm-up's spend sits in the period the player inherits and
+  // takeover falls part-way through it. Without a warm-up, content's own periods are used as given.
+  const basePeriods = W === 0 && initial.periods.length > 0 ? initial.periods : buildPeriods(scenario, W + scenario.lengthDays);
+  const periods = basePeriods.map((p) => ({ ...p, allowance: p.allowance * budgetFactor }));
   let state: GameState = {
     ...initial,
     battlePlans: initial.battlePlans.map((b) => ({
