@@ -25,7 +25,7 @@ const USER_FC = '#d9a441';
 
 const axisProps = {
   stroke: MUTED,
-  tick: { fill: INK, fontSize: 12, fontFamily: 'Pixelify Sans, monospace' },
+  tick: { fill: INK, fontSize: 12, fontFamily: 'Inter, system-ui, sans-serif' },
   tickLine: false,
 };
 
@@ -132,7 +132,7 @@ export function PlanningCharts({ view, unit, battlePlans }: Props) {
                 fill={USER_FC}
                 fillOpacity={0.18}
                 ifOverflow="hidden"
-                label={o === overrides[0] ? { value: 'your forecast', position: 'insideTop', fill: INK, fontSize: 11 } : undefined}
+                label={o === overrides[0] ? { value: 'your forecast', position: 'insideTop', fill: INK, fontSize: 12 } : undefined}
               />
             ))}
             <ReferenceLine x={today} stroke={INK} strokeWidth={2} />

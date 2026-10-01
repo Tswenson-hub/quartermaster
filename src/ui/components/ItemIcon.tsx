@@ -25,7 +25,7 @@ export function ItemIcon({ item, size = 32 }: { item: Item | undefined; size?: n
       fallback={
         <span
           className="icon-tile"
-          style={{ width: size, height: size, background: CATEGORY_COLOUR[item.category], fontSize: size * 0.42 }}
+          style={{ width: size, height: size, background: CATEGORY_COLOUR[item.category], fontSize: Math.max(12, size * 0.42) }}
           title={item.category}
           aria-hidden
         >
@@ -43,7 +43,7 @@ export function VendorTile({ id, name, size = 28 }: { id?: string; name: string;
       size={size}
       className="icon-framed"
       fallback={
-        <span className="icon-tile vendor-tile" style={{ width: size, height: size, fontSize: size * 0.42 }} aria-hidden>
+        <span className="icon-tile vendor-tile" style={{ width: size, height: size, fontSize: Math.max(12, size * 0.42) }} aria-hidden>
           {name.slice(0, 1)}
         </span>
       }
