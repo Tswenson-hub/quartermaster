@@ -27,6 +27,7 @@ export function KpiPanel() {
   const k = useKpiSummary(window);
   if (!k) return null;
   const dos = Math.round(k.daysOfSupply * 10) / 10;
+  const dosText = !Number.isFinite(dos) || dos > 999 ? '999+ d' : `${dos} d`;
 
   return (
     <Panel
@@ -51,7 +52,7 @@ export function KpiPanel() {
           value={pct(k.serviceLevel)}
           hint={k.serviceLevel >= 0.98 ? 'Every bowl filled.' : k.serviceLevel >= 0.9 ? 'A few went without.' : 'The men are going hungry.'}
         />
-        <Tile k="daysOfSupply" label="Days of supply" value={`${dos} d`} hint={dos < 3 ? 'Living hand to mouth.' : dos > 14 ? 'Stores piled high.' : 'A sensible cushion.'} />
+        <Tile k="daysOfSupply" label="Days of supply" value={dosText} hint={dos < 3 ? 'Living hand to mouth.' : dos > 14 ? 'Stores piled high.' : 'A sensible cushion.'} />
         <Tile k="spoilage" label="Spoilage" value={Math.round(k.spoiled).toLocaleString('en-GB')} hint={k.spoiled > 0 ? 'Units thrown to the pigs.' : 'Nothing rotted.'} />
         <Tile k="swape" label="SWAPE" value={pct(k.swape)} hint={k.swape <= 0.2 ? 'A sharp-eyed clerk.' : k.swape <= 0.4 ? 'Rough reckoning.' : 'Guesswork.'} />
         <Tile

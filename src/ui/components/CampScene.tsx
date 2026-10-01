@@ -51,7 +51,12 @@ export function CampScene({ cell = 40, className = '' }: { cell?: number; classN
   const cols = SCENE.ground[0].length;
 
   return (
-    <div className={`camp-scene ${className}`} aria-hidden style={{ height: cell * SCENE.ground.length }}>
+    <div
+      className={`camp-scene ${className}`}
+      aria-hidden
+      // Grass beyond the composed scene so wide containers have no bare edges.
+      style={{ height: cell * SCENE.ground.length, backgroundImage: `url(${url('tile.grass')})`, backgroundSize: `${cell}px ${cell}px` }}
+    >
       <div className="camp-grid" style={{ gridTemplateColumns: `repeat(${cols}, ${cell}px)`, gridAutoRows: `${cell}px` }}>
         {SCENE.ground.flatMap((row, y) =>
           [...row].map((g, x) => {
