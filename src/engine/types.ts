@@ -76,7 +76,11 @@ export interface ItemLocation {
   serviceLevel: number;
   /** Minimum presentation / display stock (e.g. "always keep 1 cart at camp"). */
   presentationStock: number;
-  /** Demand history, index = Day. */
+  /**
+   * Actual daily demand, oldest first; the last entry is always yesterday (today − 1).
+   * Scenarios seed it with pre-campaign history; tick() appends each day's actual demand.
+   * So the demand on day d is history[history.length - (today - d)].
+   */
   history: number[];
 }
 

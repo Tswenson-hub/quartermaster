@@ -28,3 +28,11 @@ Several agents work in parallel, each in its own git worktree/branch. Only edit 
 - Terms in UI use RELEX vocabulary (MOP, COP, D1, D2, order proposal) with medieval flavor text beside them, plus a tooltip explaining the term.
 - Raw purchased assets go in `assets/_raw/` (gitignored; licenses forbid redistribution). Curated files go in `public/assets/` and are listed in `public/assets/manifest.json`.
 - Commit small and often on your branch. Lead merges into `main`.
+
+## Engine ↔ store ↔ UI
+- Engine exposes `EngineApi` (in `types.ts`) from `src/engine/index.ts`: `initGame`, `refresh`, `forecast`, `project`, `placeOrders`, `tick`.
+- `src/store/engine.ts` binds the store to an implementation (a stub in `engineStub.ts` until the engine branch merges).
+- UI imports only from `src/store` (`useGameStore`, `select*` selectors) plus types from `src/engine/types.ts`.
+- Store actions: `loadScenario`, `decideProposal(index, decision, qty?)`, `setOverride`, `clearOverride`, `endDay`, `newGame`. Saves to localStorage key `quartermaster-save`.
+- Content exports `scenarios: Scenario[]` from `src/content/index.ts`; tutorial level 1 has id `tutorial-1`.
+- e2e `data-testid`s (UI provides): `start-scenario-<id>`, `proposal-row`, `proposal-accept`, `end-day`, `today`, `morale`, `kpi-service-level`.
