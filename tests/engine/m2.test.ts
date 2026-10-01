@@ -151,6 +151,7 @@ describe('promisedOn and delivery records', () => {
       briefing: '',
       teaches: [],
       lengthDays: 28,
+      warmupDays: 0,
       periodLengthDays: 28,
       periodAllowance: 1000,
       initial: (({ today: _a, proposals: _b, exceptions: _c, kpis: _d, openOrders: _e, difficulty: _f, market: _g, vendorTriggers: _h, vendorPlans: _i, rank: _j, letters: _k, battles: _l, status: _m, lengthDays: _n, vendorOrderDays: _o, deliveries: _p, ...rest }) => ({

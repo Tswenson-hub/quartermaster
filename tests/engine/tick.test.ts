@@ -165,6 +165,7 @@ describe('initGame + EngineApi', () => {
     briefing: '',
     teaches: [],
     lengthDays: 56,
+    warmupDays: 0, // day-0 semantics for these goldens
     periodLengthDays: 28,
     periodAllowance: 500,
     initial: (({ today: _t, proposals: _p, exceptions: _e, kpis: _k, openOrders: _o, ...rest }) => ({ ...rest, periods: [] }))(

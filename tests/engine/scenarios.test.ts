@@ -48,7 +48,8 @@ describe('order-trigger lesson rule', () => {
     const untouched = acceptAll(lesson);
     expect(untouched.vendorPlans.every((p) => p.status !== 'built')).toBe(true);
     expect(serviceLevel(untouched)).toBeLessThan(0.95);
-    expect(serviceLevel(acceptAll(lesson, true))).toBeGreaterThanOrEqual(0.95);
+    const fix = asPlayerWouldFix(lesson);
+    expect(serviceLevel(acceptAll(fix.scenario, fix.lowerTriggers))).toBeGreaterThanOrEqual(0.95);
   });
 });
 

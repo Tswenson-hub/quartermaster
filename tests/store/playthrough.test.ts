@@ -15,7 +15,7 @@ describe('playthrough: accept every proposal', () => {
         s.endDay();
       }
       const game = useGameStore.getState().game!;
-      expect(game.today).toBe(scenario.lengthDays);
+      expect(game.today).toBe(game.startDay + scenario.lengthDays);
       if (scenario.id === 'tutorial-1') expect(selectServiceLevel(game)).toBe(1);
     });
   }

@@ -7,6 +7,7 @@ export const fixtureScenario: Scenario = {
   briefing: 'Test level',
   teaches: ['MOP', 'D2'],
   lengthDays: 14,
+  warmupDays: 0, // day-0 semantics for the store goldens
   periodLengthDays: 7,
   periodAllowance: 1000,
   initial: {

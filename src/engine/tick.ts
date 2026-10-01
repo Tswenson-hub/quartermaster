@@ -43,6 +43,15 @@ export function periodFor(periods: readonly FiscalPeriod[], day: Day): FiscalPer
   return periods.find((p) => p.start <= day && day <= p.end);
 }
 
+/** Warm-up length: scenario.warmupDays ?? rules.warmup.days; a non-negative multiple of 7 (takeover on a Monday). */
+export function warmupDays(scenario: Scenario, r: Rules = defaultRules): number {
+  const w = scenario.warmupDays ?? r.warmup.days;
+  if (!Number.isInteger(w) || w < 0 || w % 7 !== 0) {
+    throw new Error(`Scenario ${scenario.id}: warm-up must be a non-negative multiple of 7 days, got ${w}`);
+  }
+  return w;
+}
+
 function buildPeriods(scenario: Scenario): FiscalPeriod[] {
   const len = Math.max(1, scenario.periodLengthDays);
   const count = Math.max(1, Math.ceil(scenario.lengthDays / len));
@@ -55,22 +64,36 @@ function buildPeriods(scenario: Scenario): FiscalPeriod[] {
   }));
 }
 
+/**
+ * Build the game and play the warm-up: for W = warmupDays(scenario) days the previous
+ * quartermaster accepts every proposal (placeOrders, then tick). KPIs, deliveries and spend
+ * accumulate; rank, letters and battles don't (tick skips career before startDay). Content's
+ * battle-plan days and fiscal periods are relative to takeover, so both shift by W. The player
+ * takes command on day W = startDay; lengthDays = W + scenario.lengthDays.
+ */
 export function initGame(scenario: Scenario, setup?: GameSetup, r: Rules = defaultRules): GameState {
   const { openOrders, rankLevel, ...initial } = scenario.initial;
+  const W = warmupDays(scenario, r);
   const difficulty = setup?.difficulty ?? 'normal';
   // §11 difficulty: budget tightness scales every period's allowance.
   const budgetFactor = r.difficulty[difficulty].budgetFactor;
   const periods = (initial.periods.length > 0 ? initial.periods : buildPeriods(scenario)).map((p) => ({
     ...p,
+    start: p.start + W,
+    end: p.end + W,
     allowance: p.allowance * budgetFactor,
   }));
-  const state: GameState = {
+  let state: GameState = {
     ...initial,
+    battlePlans: initial.battlePlans.map((b) => ({
+      ...b,
+      announcedOn: b.announcedOn + W,
+      start: b.start + W,
+      end: b.end + W,
+    })),
     today: 0,
-    // TODO(engine): warm-up. Play scenario.warmupDays ?? rules.warmup.days auto-accepting, shift battle plans,
-    // then startDay = warm-up and lengthDays = warm-up + scenario.lengthDays.
-    startDay: 0,
-    lengthDays: scenario.lengthDays,
+    startDay: W,
+    lengthDays: W + scenario.lengthDays,
     periods,
     // An opening order's promised date is the date the scenario gives it.
     openOrders: (openOrders ?? []).map((o) => ({ ...o, promisedOn: o.promisedOn ?? o.deliveryOn })),
@@ -85,7 +108,7 @@ export function initGame(scenario: Scenario, setup?: GameSetup, r: Rules = defau
       synthetic: true,
       firstDate: '',
       lastDate: '',
-      values: Array<number>(scenario.lengthDays).fill(1),
+      values: Array<number>(W + scenario.lengthDays).fill(1),
     },
     vendorTriggers: {},
     vendorOrderDays: {},
@@ -96,7 +119,12 @@ export function initGame(scenario: Scenario, setup?: GameSetup, r: Rules = defau
     battles: [],
     status: 'playing',
   };
-  return refresh(state, r);
+  state = refresh(state, r);
+  for (let d = 0; d < W; d++) {
+    const acceptAll = state.proposals.map((p, index) => ({ index, decision: p.qty > 0 ? ('accepted' as const) : ('rejected' as const) }));
+    state = tick(placeOrders(state, acceptAll, r), r);
+  }
+  return { ...state, status: 'playing' };
 }
 
 /** Earliest day a new order could arrive for this item-location (any source). */
@@ -370,7 +398,11 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
   kpi.daysOfSupply = coverDays(stockSum, forecastSum, 0);
 
   const kpis = [...state.kpis, kpi];
-  const career = updateCareer(state, t, kpis, locations, period && period.end === t ? period : undefined, r);
+  // No rank, letters or battles during the warm-up (the previous quartermaster's days).
+  const career =
+    t < (state.startDay ?? 0)
+      ? { rank: state.rank, letters: [], battles: [], status: state.status }
+      : updateCareer(state, t, kpis, locations, period && period.end === t ? period : undefined, r);
 
   const next: GameState = {
     ...state,
