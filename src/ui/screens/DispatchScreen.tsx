@@ -14,6 +14,7 @@ const KIND: Record<ExceptionKind, { label: string; severity: 'critical' | 'serio
   'delivery-late': { label: 'Late wagon', severity: 'serious' },
   'over-budget': { label: 'Over budget', severity: 'critical' },
   spoilage: { label: 'Spoilage', severity: 'warning' },
+  stockout: { label: 'Stockout', severity: 'critical' },
 };
 const SEVERITY_ICON = { critical: '!!', serious: '!', warning: '?', info: 'i' };
 const SEVERITY_RANK = { critical: 0, serious: 1, warning: 2, info: 3 };
