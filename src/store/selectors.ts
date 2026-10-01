@@ -1,5 +1,16 @@
 // Read-only views over GameState for the UI. UI calls these instead of importing the engine.
-import type { Day, DepotId, ForecastPoint, GameState, ItemId, PlanningException, PlanningParams } from '../engine/types';
+import type {
+  Day,
+  DepotId,
+  ForecastPoint,
+  GameState,
+  ItemId,
+  OpenOrder,
+  PlanningException,
+  PlanningParams,
+  ProposalDecisionInput,
+} from '../engine/types';
+import type { DecisionEntry } from './gameStore';
 import { engine } from './engine';
 
 export function selectForecast(game: GameState, itemId: ItemId, depotId: DepotId, from: Day, to: Day): ForecastPoint[] {
@@ -29,4 +40,39 @@ export function selectServiceLevel(game: GameState): number {
   const demand = game.kpis.reduce((a, k) => a + k.demand, 0);
   const fulfilled = game.kpis.reduce((a, k) => a + k.fulfilled, 0);
   return demand === 0 ? 1 : fulfilled / demand;
+}
+
+export interface DecisionPreview {
+  /** Orders that would be placed if the day ended now (surcharges included in cost). */
+  orders: OpenOrder[];
+  /** Total value of those orders, incl. surcharges. */
+  spend: number;
+  /** Sum of vendor-minimum surcharges among them. */
+  surcharges: number;
+  /** Indices of accepted proposals the engine would drop (e.g. below vendor minimum with no surcharge). */
+  dropped: number[];
+}
+
+/**
+ * What ending the day would order, computed by the engine's own placeOrders on today's decisions.
+ * Use this for pending spend / minimum / surcharge displays instead of re-deriving vendor rules in UI.
+ */
+export function selectDecisionPreview(game: GameState, decisions: Record<number, DecisionEntry>): DecisionPreview {
+  const inputs: ProposalDecisionInput[] = Object.entries(decisions).map(([i, d]) => ({ index: Number(i), ...d }));
+  const before = new Set(game.openOrders.map((o) => o.id));
+  const orders = engine.placeOrders(game, inputs).openOrders.filter((o) => !before.has(o.id));
+  const placed = new Set(orders.map((o) => `${o.itemId}|${o.depotId}|${o.vendorId}`));
+  const dropped = inputs
+    .filter((d) => d.decision === 'accepted')
+    .map((d) => d.index)
+    .filter((i) => {
+      const p = game.proposals[i];
+      return p && !placed.has(`${p.itemId}|${p.depotId}|${p.vendorId}`);
+    });
+  return {
+    orders,
+    spend: orders.reduce((a, o) => a + o.cost, 0),
+    surcharges: orders.reduce((a, o) => a + (o.surcharge ?? 0), 0),
+    dropped,
+  };
 }
