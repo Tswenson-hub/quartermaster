@@ -13,9 +13,9 @@ describe('content', () => {
     expect(s.lengthDays).toBe(14);
   });
 
-  it('has 9 tutorial levels plus a sandbox with unique ids', () => {
-    expect(scenarios).toHaveLength(10);
-    expect(new Set(scenarios.map((s) => s.id)).size).toBe(10);
+  it('has 10 tutorial levels plus a sandbox with unique ids', () => {
+    expect(scenarios).toHaveLength(11);
+    expect(new Set(scenarios.map((s) => s.id)).size).toBe(11);
   });
 
   it('sourcing references known items/vendors; split shares sum to 1', () => {
@@ -57,11 +57,20 @@ describe('content', () => {
         for (const l of st.locations) {
           expect(st.items[l.itemId]).toBeDefined();
           expect(st.depots[l.depotId]).toBeDefined();
-          expect(l.history.length).toBeGreaterThanOrEqual(28);
+          if (st.depots[l.depotId].kind !== 'dc') expect(l.history.length).toBeGreaterThanOrEqual(28);
           expect(l.history.every((d) => Number.isInteger(d) && d >= 0)).toBe(true);
           expect(st.sourcing.some((r) => r.itemId === l.itemId)).toBe(true);
         }
         for (const r of st.sourcing) expect(st.vendors[r.vendorId]).toBeDefined();
+        // Every location has exactly the sources scoped to it (or unscoped); DC lanes only serve front depots.
+        for (const l of st.locations) {
+          const rules = st.sourcing.filter((r) => r.itemId === l.itemId && (!r.depotIds || r.depotIds.includes(l.depotId)));
+          expect(rules.length, `${l.itemId}@${l.depotId}`).toBeGreaterThan(0);
+          const lanes = rules.filter((r) => st.vendors[r.vendorId].dcDepotId);
+          if (st.depots[l.depotId].kind === 'dc') expect(lanes).toHaveLength(0);
+          if (lanes.length > 0) expect(rules).toHaveLength(lanes.length);
+          for (const r of lanes) expect(st.depots[st.vendors[r.vendorId].dcDepotId!]?.kind).toBe('dc');
+        }
         const byItem = new Map<string, number>();
         for (const r of st.sourcing) if (r.splitShare !== undefined) byItem.set(r.itemId, (byItem.get(r.itemId) ?? 0) + r.splitShare);
         for (const total of byItem.values()) expect(total).toBeCloseTo(1);
