@@ -29,7 +29,7 @@ produces the same numbers.
   remains, `splitShare` is dropped.
 - **Opening stock** is `mean × onHandDays`, capped at half the shelf life for perishables.
 - **Period allowance** is the expected base spend at the cheapest source × the period length × a
-  per-level factor (1.5 in levels I–II, 1.1–1.3 after that, 1.35 in the sandbox). Battle-plan
+  per-level factor (1.5 in levels I–II, 1.1–1.3 after that, 1.35 in the sandbox), rounded to two significant figures (sandbox: 83,000). Battle-plan
   uplift is not included, so letters create budget pressure. A final period cut short by the
   scenario end gets a pro-rated allowance.
 - **Balance targets** (accept every proposal, checked against the real engine): service ≥ 95% on

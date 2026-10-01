@@ -119,6 +119,13 @@ function scenarioSourcing(itemIds: ItemId[], vendorIds: VendorId[], lines: LineS
   return out;
 }
 
+/** A treasurer's figure: two significant digits (83,240 → 83,000; 4,680 → 4,700; 840 → 840). */
+function roundToTwoFigures(x: number): number {
+  if (x <= 0) return 0;
+  const step = 10 ** Math.max(0, Math.floor(Math.log10(x)) - 1);
+  return Math.round(x / step) * step;
+}
+
 /** Fiscal periods; a final period cut short by the scenario end gets a pro-rated allowance. */
 function buildPeriods(lengthDays: number, periodLengthDays: number, allowance: number): FiscalPeriod[] {
   const periods: FiscalPeriod[] = [];
@@ -153,7 +160,7 @@ function buildScenario(s: ScenarioSpec): Scenario {
     };
   });
 
-  const periodAllowance = Math.round((dailySpend * s.periodLengthDays * s.allowanceFactor) / 10) * 10;
+  const periodAllowance = roundToTwoFigures(dailySpend * s.periodLengthDays * s.allowanceFactor);
   const battlePlans: BattlePlan[] = (s.battlePlanIds ?? []).map((id) => {
     const p = BATTLE_PLANS_BY_ID[id];
     if (!p) throw new Error(`content: unknown battle plan "${id}"`);
