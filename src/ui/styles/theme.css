@@ -669,6 +669,9 @@ input {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 4px 0;
   border: 0;
   background: none;
   cursor: pointer;
