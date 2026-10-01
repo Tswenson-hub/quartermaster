@@ -30,14 +30,15 @@ import {
   selectExceptionsToday,
   selectForecast,
   selectKpiSummary,
+  selectLetterText,
   selectMarketInfo,
   selectPlanningParams,
   selectProjection,
   selectServiceLevel,
   useGameStore,
 } from '../store';
-import * as content from '../content';
 import { scenarios } from '../content';
+import { DIFFICULTY_FLAVOUR, RANKS, rankTitle } from '../content/ranks';
 import { useUiStore } from './uiStore';
 
 /** Playable levels, tutorial first. */
@@ -79,8 +80,9 @@ export function useGameActions() {
 
 export { getApiKey, setApiKey } from '../store';
 
+/** Difficulty presets (rules) with content's title and description. */
 export function useDifficultyOptions() {
-  return useMemo(() => selectDifficultyOptions(), []);
+  return useMemo(() => selectDifficultyOptions().map((o) => ({ ...o, ...DIFFICULTY_FLAVOUR[o.id] })), []);
 }
 
 export function useMarketInfo() {
@@ -90,12 +92,7 @@ export function useMarketInfo() {
 
 // ---------------------------------------------------------------- rank & letters
 
-// Content adds RANK_TITLES (lowest rank first); fall back to "Rank N" until it lands.
-const rankTitles = (content as unknown as { RANK_TITLES?: readonly string[] }).RANK_TITLES ?? [];
-
-export function rankTitle(level: number): string {
-  return rankTitles[level] ?? `Rank ${level + 1}`;
-}
+export { rankTitle };
 
 export function useRank() {
   const game = useGame();
@@ -108,10 +105,16 @@ export function useRank() {
       reprimands,
       overspentStreak,
       title: rankTitle(level),
-      /** Highest level with a title (for drawing pips); at least the current level. */
-      maxLevel: Math.max(level, rankTitles.length - 1),
+      flavour: RANKS[Math.min(Math.max(level, 0), RANKS.length - 1)]?.flavour ?? '',
+      maxLevel: RANKS.length - 1,
     };
   }, [game]);
+}
+
+/** Letters with display text (content templates filled with the engine's facts), oldest first. */
+export function useLetterTexts() {
+  const game = useGame();
+  return useMemo(() => (game ? game.letters.map((letter) => ({ letter, text: selectLetterText(game, letter) })) : []), [game]);
 }
 
 export function useLetters(): Letter[] {

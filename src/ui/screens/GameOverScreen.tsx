@@ -2,19 +2,20 @@ import { KpiPanel } from '../components/KpiPanel';
 import { Panel } from '../components/Panel';
 import { RankBadge } from '../components/RankBadge';
 import { fmtDay } from '../format';
-import { useGame, useGameActions, useRank } from '../hooks';
+import { useGame, useGameActions, useLetterTexts, useRank } from '../hooks';
 import { useUiStore } from '../uiStore';
 
 /** End of campaign: completed, or dismissed after falling below the lowest rank. */
 export function GameOverScreen({ onReview }: { onReview: () => void }) {
   const game = useGame();
   const rank = useRank();
+  const letters = useLetterTexts();
   const { quitGame } = useGameActions();
   const resetCampaign = useUiStore((s) => s.resetCampaign);
   if (!game || !rank) return null;
   const lost = game.status === 'lost';
   const won = game.battles.filter((b) => b.won).length;
-  const dismissal = [...game.letters].reverse().find((l) => l.kind === 'game-over');
+  const dismissal = [...letters].reverse().find(({ letter }) => letter.kind === 'game-over')?.text;
 
   return (
     <div className="stack" data-testid="game-over">

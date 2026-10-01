@@ -4,7 +4,7 @@ import { Panel } from '../components/Panel';
 import { Sprite } from '../components/Sprite';
 import { Term } from '../components/Term';
 import { fmtDay } from '../format';
-import { useLetters, useRank } from '../hooks';
+import { useLetterTexts, useRank } from '../hooks';
 import { LETTER_KIND } from '../letterKinds';
 import { RankBadge } from '../components/RankBadge';
 import { useUiStore } from '../uiStore';
@@ -20,13 +20,15 @@ export function LetterSeal({ letter, size = 28 }: { letter: Letter; size?: numbe
 }
 
 export function LettersScreen() {
-  const letters = useLetters();
+  const letters = useLetterTexts();
   const rank = useRank();
   const read = useUiStore((s) => s.readLetters);
   const readLetter = useUiStore((s) => s.readLetter);
   const newest = [...letters].reverse();
-  const [selectedId, setSelectedId] = useState<string | undefined>(newest.find((l) => !read[l.id])?.id ?? newest[0]?.id);
-  const selected = letters.find((l) => l.id === selectedId);
+  const [selectedId, setSelectedId] = useState<string | undefined>(
+    newest.find((l) => !read[l.letter.id])?.letter.id ?? newest[0]?.letter.id,
+  );
+  const selected = letters.find((l) => l.letter.id === selectedId);
   useEffect(() => {
     if (selectedId) readLetter(selectedId);
   }, [selectedId, readLetter]);
@@ -43,7 +45,7 @@ export function LettersScreen() {
               </span>
             </span>
           }
-          flavour="Your standing with command. Keep to the budget and keep the army fed."
+          flavour={rank.flavour}
         >
           <dl className="rank-facts">
             <dt>Merit toward promotion</dt>
@@ -67,7 +69,7 @@ export function LettersScreen() {
             <p className="empty">No letters yet. Command is watching.</p>
           ) : (
             <ul className="letters-list">
-              {newest.map((l) => (
+              {newest.map(({ letter: l, text }) => (
                 <li key={l.id}>
                   <button
                     type="button"
@@ -77,7 +79,7 @@ export function LettersScreen() {
                   >
                     <LetterSeal letter={l} size={24} />
                     <span className="letter-row-text">
-                      <span className="letter-row-subject">{l.subject}</span>
+                      <span className="letter-row-subject">{text.subject}</span>
                       <span className="muted">
                         {LETTER_KIND[l.kind].label} · {fmtDay(l.day)}
                       </span>
@@ -90,15 +92,15 @@ export function LettersScreen() {
         </Panel>
 
         {selected && (
-          <article className={`letter command-letter kind-${selected.kind}`}>
+          <article className={`letter command-letter kind-${selected.letter.kind}`}>
             <header className="letter-head">
-              <h3>{selected.subject}</h3>
-              <LetterSeal letter={selected} size={40} />
+              <h3>{selected.text.subject}</h3>
+              <LetterSeal letter={selected.letter} size={40} />
             </header>
             <p className="letter-meta muted">
-              From {selected.from} · {fmtDay(selected.day)}
+              From {selected.text.from} · {fmtDay(selected.letter.day)}
             </p>
-            {selected.body.split(/\n\n+/).map((para, i) => (
+            {selected.text.body.split(/\n\n+/).map((para, i) => (
               <p key={i} className="letter-body">
                 {para}
               </p>
