@@ -57,6 +57,12 @@ describe('CO-MRP build to minimum (golden)', () => {
       ['c', 'vendor-min-fill', 20],
     ]);
     expect(out.proposals.map((p) => p.cost)).toEqual([120, 40, 40]);
+    // a's real need is 30; the build added 30 more. b and c are entirely build.
+    expect(out.proposals.map((p) => [p.itemId, p.qty - p.builtQty!, p.builtQty])).toEqual([
+      ['a', 30, 30],
+      ['b', 0, 20],
+      ['c', 0, 20],
+    ]);
     expect(out.exceptions).toEqual([]);
   });
 
@@ -104,6 +110,7 @@ describe('CO-MRP build to minimum (golden)', () => {
 
   it('must lines alone meet the minimum → unchanged', () => {
     expect(table(run({ kind: 'units', amount: 30 }, 0.5).proposals)).toEqual([['a', 'must', 30]]);
+    expect(run({ kind: 'units', amount: 30 }, 0.5).proposals[0].builtQty).toBe(0);
   });
 
   it('no must need → no order and no exception', () => {
@@ -116,6 +123,7 @@ describe('CO-MRP build to minimum (golden)', () => {
 
   it('vendor without a minimum: must lines only', () => {
     expect(table(run(undefined, 0.5).proposals)).toEqual([['a', 'must', 30]]);
+    expect(run(undefined, 0.5).proposals[0].builtQty).toBe(0);
   });
 
   it('candidates without forecast cannot absorb packs → built-short', () => {

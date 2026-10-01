@@ -41,6 +41,16 @@ describe('proposals exposed by refresh', () => {
   it('sandbox accept-all: every proposal on every day has qty > 0', () => {
     playSandbox((s) => expect(s.proposals.filter((p) => p.qty <= 0)).toEqual([]));
   });
+
+  it('sandbox accept-all: builtQty always set, 0 ≤ builtQty ≤ qty, and only build lines are pure build', () => {
+    playSandbox((s) => {
+      for (const p of s.proposals) {
+        expect(p.builtQty).toBeGreaterThanOrEqual(0);
+        expect(p.builtQty).toBeLessThanOrEqual(p.qty);
+        if (p.reason === 'vendor-min-fill') expect(p.builtQty).toBe(p.qty);
+      }
+    });
+  });
 });
 
 describe('exception messages', () => {
