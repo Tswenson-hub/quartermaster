@@ -3,7 +3,8 @@ import type { Vendor, VendorId } from '../engine/types';
 /**
  * Suppliers to the army. Weekdays: 0 = Monday … 6 = Sunday.
  *
- * `reliability` is read as the chance a delivery arrives on time and in full (1 = never fails).
+ * `reliability` is the chance a delivery arrives on time and in full (1 = never fails).
+ * `minimum.surcharge` is the flat silver fee for accepting an order below the minimum.
  * Each vendor has a distinct order rhythm so D2 (the next order opportunity's delivery) differs.
  */
 const list: Vendor[] = [
@@ -21,7 +22,7 @@ const list: Vendor[] = [
     name: 'Worshipful Guild of Fletchers',
     orderDays: [1],
     leadTimeDays: 5,
-    minimum: { kind: 'units', amount: 120 },
+    minimum: { kind: 'units', amount: 120, surcharge: 15 },
     reliability: 0.9,
   },
   {
@@ -30,7 +31,7 @@ const list: Vendor[] = [
     name: 'Ironhollow Mountain Smithy',
     orderDays: [2],
     leadTimeDays: 7,
-    minimum: { kind: 'value', amount: 250 },
+    minimum: { kind: 'value', amount: 250, surcharge: 40 },
     reliability: 0.8,
   },
   {
@@ -55,7 +56,7 @@ const list: Vendor[] = [
     name: 'Royal Armory of Kingsreach',
     orderDays: [4],
     leadTimeDays: 4,
-    minimum: { kind: 'value', amount: 400 },
+    minimum: { kind: 'value', amount: 400, surcharge: 60 },
     reliability: 0.99,
   },
 ];
