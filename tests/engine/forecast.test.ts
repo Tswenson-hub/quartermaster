@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baselineFromHistory, forecast, forecastErrorStdDev } from '../../src/engine/forecast';
+import { baselineFromHistory, forecast, forecastErrorStdDev, oneStepBaselines } from '../../src/engine/forecast';
 import { rules, type Rules } from '../../src/engine/rules.config';
 import type { BattlePlan } from '../../src/engine/types';
 import { flat, loc, state } from './fixtures';
@@ -18,16 +18,30 @@ const plan = (extra: Partial<BattlePlan> = {}): BattlePlan => ({
 });
 
 describe('baseline', () => {
-  it('14-day moving average uses only the last 14 days', () => {
-    expect(baselineFromHistory([...flat(20, 7), ...flat(10)])).toBe(10);
-    expect(baselineFromHistory([4, 6])).toBe(5);
+  it('default is simple exponential smoothing', () => {
+    expect(rules.forecast).toEqual({ method: 'exp-smoothing', alpha: 0.2, initWindow: 7 });
     expect(baselineFromHistory([])).toBe(0);
+    expect(baselineFromHistory(flat(10, 30))).toBe(10);
   });
 
-  it('exponential smoothing', () => {
-    const r: Rules = { ...rules, forecast: { method: 'exp-smoothing', alpha: 0.5 } };
-    expect(baselineFromHistory([10, 20], r)).toBe(15);
-    expect(baselineFromHistory([10, 20, 30], r)).toBe(22.5);
+  it('SES: level starts at the mean of the first initWindow days, then smooths', () => {
+    const r: Rules = { ...rules, forecast: { method: 'exp-smoothing', alpha: 0.5, initWindow: 2 } };
+    expect(baselineFromHistory([10], r)).toBe(10);
+    expect(baselineFromHistory([10, 20], r)).toBe(15); // mean of first 2
+    expect(baselineFromHistory([10, 20, 30], r)).toBe(22.5); // 0.5×30 + 0.5×15
+    expect(baselineFromHistory([10, 20, 30, 40], r)).toBe(31.25); // 0.5×40 + 0.5×22.5
+    expect(oneStepBaselines([10, 20, 30, 40], r)).toEqual([0, 10, 15, 22.5, 31.25]);
+  });
+
+  it('SES default α = 0.2: a jump of 10 moves the level by 2', () => {
+    expect(baselineFromHistory([...flat(10, 7), 20])).toBeCloseTo(12, 10);
+    expect(baselineFromHistory([...flat(10, 7), 20, 20])).toBeCloseTo(13.6, 10); // 0.2×20 + 0.8×12
+  });
+
+  it('14-day moving average (alternative) uses only the last 14 days', () => {
+    const ma: Rules = { ...rules, forecast: { method: 'moving-average', window: 14 } };
+    expect(baselineFromHistory([...flat(20, 7), ...flat(10)], ma)).toBe(10);
+    expect(baselineFromHistory([4, 6], ma)).toBe(5);
   });
 
   it('σ(forecast error) = RMSE of one-step-ahead forecasts', () => {
@@ -86,8 +100,8 @@ describe('forecast', () => {
     const s = state({ today: 2, locations: [loc('grain', { history: [...flat(10), 20, 20] })] });
     const f = forecast(s, 'grain', 'camp', 0, 2);
     expect(f[0].baseline).toBe(10);
-    expect(f[1].baseline).toBeCloseTo(150 / 14, 10);
-    expect(f[2].baseline).toBeCloseTo(160 / 14, 10);
+    expect(f[1].baseline).toBeCloseTo(12, 10); // 0.2×20 + 0.8×10
+    expect(f[2].baseline).toBeCloseTo(13.6, 10); // 0.2×20 + 0.8×12
   });
 
   it('throws for an unknown item-location', () => {

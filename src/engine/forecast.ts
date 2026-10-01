@@ -2,17 +2,41 @@
 import { rules as defaultRules, type Rules } from './rules.config';
 import type { Day, DepotId, ForecastPoint, GameState, ItemId, ItemLocation } from './types';
 
-/** Flat baseline from history (oldest first). Empty history → 0. */
-export function baselineFromHistory(history: readonly number[], r: Rules = defaultRules): number {
-  if (history.length === 0) return 0;
+/**
+ * One-step-ahead baselines: out[i] is the baseline forecast for history[i] made from
+ * history[0..i) (out[0] = 0, no history). out[history.length] is the forecast for today.
+ * Single pass for exponential smoothing.
+ */
+export function oneStepBaselines(history: readonly number[], r: Rules = defaultRules): number[] {
   const f = r.forecast;
+  const out: number[] = [0];
   if (f.method === 'moving-average') {
-    const tail = history.slice(-f.window);
-    return tail.reduce((a, b) => a + b, 0) / tail.length;
+    for (let i = 1; i <= history.length; i++) {
+      const tail = history.slice(Math.max(0, i - f.window), i);
+      out.push(tail.reduce((a, b) => a + b, 0) / tail.length);
+    }
+    return out;
   }
-  let level = history[0];
-  for (let i = 1; i < history.length; i++) level = f.alpha * history[i] + (1 - f.alpha) * level;
-  return level;
+  // Running mean while initialising, then smoothing.
+  const k = Math.max(1, f.initWindow);
+  let sum = 0;
+  let level = 0;
+  for (let i = 0; i < history.length; i++) {
+    if (i < k) {
+      sum += history[i];
+      level = sum / (i + 1);
+    } else {
+      level = f.alpha * history[i] + (1 - f.alpha) * level;
+    }
+    out.push(level);
+  }
+  return out;
+}
+
+/** Flat baseline for today from history (oldest first). Empty history → 0. */
+export function baselineFromHistory(history: readonly number[], r: Rules = defaultRules): number {
+  const out = oneStepBaselines(history, r);
+  return out[out.length - 1];
 }
 
 /**
@@ -20,11 +44,12 @@ export function baselineFromHistory(history: readonly number[], r: Rules = defau
  * `rules.forecastError.window` days of history. Fewer than 2 points of history → 0.
  */
 export function forecastErrorStdDev(history: readonly number[], r: Rules = defaultRules): number {
+  const f = oneStepBaselines(history, r);
   const start = Math.max(1, history.length - r.forecastError.window);
   let sumSq = 0;
   let n = 0;
   for (let i = start; i < history.length; i++) {
-    const e = history[i] - baselineFromHistory(history.slice(0, i), r);
+    const e = history[i] - f[i];
     sumSq += e * e;
     n++;
   }

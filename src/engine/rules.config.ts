@@ -20,8 +20,13 @@ export interface Rules {
   orderUpToExtraDays: number;
   /** Rounding to pack size: 'up' always, or 'nearest' with a threshold (0–1 of a pack). */
   packRounding: { mode: 'up' } | { mode: 'nearest'; threshold: number };
-  /** Baseline forecast method. */
-  forecast: { method: 'moving-average'; window: number } | { method: 'exp-smoothing'; alpha: number };
+  /**
+   * Baseline forecast method (§8). Simple exponential smoothing (default): the level starts as
+   * the mean of the first `initWindow` days, then level ← alpha × actual + (1 − alpha) × level.
+   */
+  forecast:
+    | { method: 'moving-average'; window: number }
+    | { method: 'exp-smoothing'; alpha: number; initWindow: number };
   /** How battle-plan uplift combines with baseline. */
   eventBlend: 'multiply' | 'add';
   /** Vendor-minimum fill: rank candidates below COP by this. */
@@ -99,7 +104,7 @@ export const rules: Rules = {
   canOrderPoint: { extraDaysOfCover: 3 },
   orderUpToExtraDays: 0,
   packRounding: { mode: 'up' },
-  forecast: { method: 'moving-average', window: 14 },
+  forecast: { method: 'exp-smoothing', alpha: 0.2, initWindow: 7 },
   eventBlend: 'multiply',
   vendorMinFillPriority: 'days-of-cover',
   budget: { overspendTolerance: 0, overspendCarryPenalty: 1, moralePerOverspendPct: 0.5 },
