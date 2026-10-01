@@ -257,6 +257,11 @@ export type ExceptionKind =
 
 export interface PlanningException {
   kind: ExceptionKind;
+  /**
+   * The day the event happened, not the day it is reported. Events from the overnight tick (stockout,
+   * forecast-deviation, delivery-late, dc-short, spoilage) are dated today − 1; planning exceptions raised by
+   * refresh (below-mop, stockout-risk, vendor-min-shortfall) are dated today.
+   */
   day: Day;
   itemId?: ItemId;
   depotId?: DepotId;

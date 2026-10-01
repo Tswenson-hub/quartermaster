@@ -46,8 +46,14 @@ export function selectCurrentPeriod(game: GameState) {
   return game.periods.find((p) => game.today >= p.start && game.today <= p.end);
 }
 
+/** @deprecated Misses overnight events (dated today − 1). Use selectRecentExceptions. */
 export function selectExceptionsToday(game: GameState): PlanningException[] {
   return game.exceptions.filter((e) => e.day === game.today);
+}
+
+/** This morning's dispatch: last night's events (dated today − 1) plus today's planning exceptions. */
+export function selectRecentExceptions(game: GameState): PlanningException[] {
+  return game.exceptions.filter((e) => e.day >= game.today - 1);
 }
 
 /** Service level so far = fulfilled / demand over all ticked days, 0–1. 1 when there has been no demand. */

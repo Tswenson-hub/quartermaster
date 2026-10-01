@@ -94,3 +94,12 @@ describe('master data selectors', async () => {
     expect(selectVendorRows(game).find((v) => v.vendorId === 'mill')!.orderDays).toHaveLength(7);
   });
 });
+
+describe('selectRecentExceptions', () => {
+  it('includes last night and today, not older', async () => {
+    const { selectRecentExceptions } = await import('../../src/store/selectors');
+    const game = { ...engine.initGame(fixtureScenario), today: 5 };
+    game.exceptions = [3, 4, 5].map((day) => ({ kind: 'stockout' as const, day, message: `d${day}` }));
+    expect(selectRecentExceptions(game).map((e) => e.day)).toEqual([4, 5]);
+  });
+});
