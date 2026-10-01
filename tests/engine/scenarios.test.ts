@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { scenarios } from '../../src/content';
 import type { Scenario } from '../../src/engine/types';
-import { acceptAll, isTriggerLesson, serviceLevel } from './play';
+import { acceptAll, asPlayerWouldFix, isOverrideLesson, isTriggerLesson, serviceLevel } from './play';
 
 describe('accept-all on content scenarios', () => {
   it('tutorial-2 (abbey, LT 3, Mon/Thu) keeps service ≥ 95%', () => {
@@ -10,18 +10,19 @@ describe('accept-all on content scenarios', () => {
     expect(serviceLevel(s)).toBeGreaterThanOrEqual(0.95);
   });
 
-  // Defaults must reach ≥ 95%, except order-trigger lessons (teaches 'order trigger'), whose
-  // deliberately high triggers the player first lowers to the rules default.
-  it.each(scenarios.map((x) => [`${x.id}${isTriggerLesson(x) ? ' (triggers lowered)' : ''}`, x] as const))(
-    '%s keeps service ≥ 95%%',
-    (_id, scenario) => {
-      expect(serviceLevel(acceptAll(scenario, isTriggerLesson(scenario)))).toBeGreaterThanOrEqual(0.95);
-    },
-  );
+  // Defaults must reach ≥ 95%, except lessons that expect a player action first (see asPlayerWouldFix):
+  // order-trigger lessons lower triggers; forecast-override lessons reveal the true surge.
+  const cases = scenarios.map((x) => {
+    const fix = asPlayerWouldFix(x);
+    return [`${x.id}${fix.note}`, fix] as const;
+  });
 
-  it.each(scenarios.map((x) => [x.id, x] as const))('%s is deterministic', (_id, scenario) => {
-    const lower = isTriggerLesson(scenario);
-    expect(acceptAll(scenario, lower)).toEqual(acceptAll(scenario, lower));
+  it.each(cases)('%s keeps service ≥ 95%%', (_id, fix) => {
+    expect(serviceLevel(acceptAll(fix.scenario, fix.lowerTriggers))).toBeGreaterThanOrEqual(0.95);
+  });
+
+  it.each(cases)('%s is deterministic', (_id, fix) => {
+    expect(acceptAll(fix.scenario, fix.lowerTriggers)).toEqual(acceptAll(fix.scenario, fix.lowerTriggers));
   });
 });
 
@@ -48,5 +49,23 @@ describe('order-trigger lesson rule', () => {
     expect(untouched.vendorPlans.every((p) => p.status !== 'built')).toBe(true);
     expect(serviceLevel(untouched)).toBeLessThan(0.95);
     expect(serviceLevel(acceptAll(lesson, true))).toBeGreaterThanOrEqual(0.95);
+  });
+});
+
+describe('forecast-override lesson rule', () => {
+  const lesson = scenarios.find(isOverrideLesson);
+
+  it('content has an override lesson, and its fix reveals the true surge', () => {
+    expect(lesson).toBeDefined();
+    const fix = asPlayerWouldFix(lesson!);
+    expect(fix.note).toBe(' (surge overridden)');
+    expect(fix.scenario.initial.battlePlans.length).toBeGreaterThan(0);
+    for (const b of fix.scenario.initial.battlePlans) expect(b.statedUplift).toEqual(b.actualUplift);
+    expect(lesson!.initial.battlePlans).not.toBe(fix.scenario.initial.battlePlans); // original untouched
+  });
+
+  it('other scenarios are played as-is', () => {
+    const plain = scenarios.find((x) => !isOverrideLesson(x) && !isTriggerLesson(x))!;
+    expect(asPlayerWouldFix(plain)).toEqual({ scenario: plain, lowerTriggers: false, note: '' });
   });
 });
