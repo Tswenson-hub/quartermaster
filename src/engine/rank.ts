@@ -11,6 +11,7 @@ import type {
   GameStatus,
   ItemLocation,
   Letter,
+  LetterFacts,
   LetterKind,
   RankState,
 } from './types';
@@ -67,7 +68,16 @@ export function updateCareer(
   const letters: Letter[] = [];
   const battles: BattleOutcome[] = [];
   const decidedOn = t + 1;
-  const letter = (kind: LetterKind, from: string, subject: string, body: string, battlePlanId?: string) =>
+  // facts: rank as it stands right after this letter's event, plus what the letter is about.
+  // The store renders content templates from them; from/subject/body are the fallback text.
+  const letter = (
+    kind: LetterKind,
+    from: string,
+    subject: string,
+    body: string,
+    about: Omit<LetterFacts, 'rankLevel'> = {},
+    battlePlanId?: string,
+  ) =>
     letters.push({
       id: `L${decidedOn}-${letters.length + 1}-${kind}${battlePlanId ? `-${battlePlanId}` : ''}`,
       day: decidedOn,
@@ -75,19 +85,25 @@ export function updateCareer(
       from,
       subject,
       body,
+      facts: { rankLevel: rank.level, ...about },
       ...(battlePlanId ? { battlePlanId } : {}),
     });
 
-  const demote = (levels: number, why: string) => {
+  const demote = (levels: number, why: string, about: Omit<LetterFacts, 'rankLevel'>, battlePlanId?: string) => {
     rank.level -= levels;
     rank.reprimands = 0;
     rank.merit = 0;
-    letter('demotion', 'The Marshal', 'Reduced in rank', `${why} You are reduced to rank ${rank.level}.`);
+    letter('demotion', 'The Marshal', 'Reduced in rank', `${why} You are reduced to rank ${rank.level}.`, {
+      ...about,
+      reprimands: 0,
+      merit: 0,
+    }, battlePlanId);
   };
 
   if (period && period.end === t) {
     const overspend = period.committed - period.allowance;
     const sl = serviceLevel(kpis.filter((k) => k.day >= period.start && k.day <= t));
+    const aboutPeriod = { periodIndex: period.index, committed: period.committed, allowance: period.allowance, serviceLevel: sl };
     if (overspend > period.allowance * R.reprimandOverspendPct) {
       rank.overspentStreak += 1;
       rank.reprimands += 1;
@@ -97,8 +113,11 @@ export function updateCareer(
         `Letter of reprimand — period ${period.index + 1}`,
         `You spent ${Math.round(period.committed)} silver against an allowance of ${Math.round(period.allowance)}. ` +
           `This is reprimand ${rank.reprimands} of ${R.reprimandsPerDemotion}.`,
+        { ...aboutPeriod, reprimands: rank.reprimands, merit: rank.merit },
       );
-      if (rank.reprimands >= R.reprimandsPerDemotion) demote(1, 'The Treasury has lost patience with your accounts.');
+      if (rank.reprimands >= R.reprimandsPerDemotion) {
+        demote(1, 'The Treasury has lost patience with your accounts.', aboutPeriod);
+      }
     } else {
       rank.overspentStreak = 0;
       if (overspend <= 0 && sl >= R.meritServiceLevel) {
@@ -108,6 +127,7 @@ export function updateCareer(
           'The Marshal',
           `Commendation — period ${period.index + 1}`,
           `On budget, and ${Math.round(sl * 100)}% of the army's needs met. Merit ${rank.merit} of ${R.promotionMerit}.`,
+          { ...aboutPeriod, reprimands: rank.reprimands, merit: rank.merit },
         );
       }
     }
@@ -116,14 +136,28 @@ export function updateCareer(
   for (const plan of state.battlePlans) {
     if (plan.end !== t) continue;
     const sl = battleServiceLevel(plan, locations, decidedOn);
-    const won = sl >= R.battleWinServiceLevel;
+    const won = sl >= (plan.winServiceLevel ?? R.battleWinServiceLevel);
     battles.push({ battlePlanId: plan.id, day: decidedOn, won, serviceLevel: sl });
     if (won) {
       rank.merit += R.meritPerBattleWon;
-      letter('battle-won', 'The Marshal', `Victory: ${plan.title}`, `The army was ${Math.round(sl * 100)}% supplied and carried the day.`, plan.id);
+      letter(
+        'battle-won',
+        'The Marshal',
+        `Victory: ${plan.title}`,
+        `The army was ${Math.round(sl * 100)}% supplied and carried the day.`,
+        { serviceLevel: sl, merit: rank.merit, reprimands: rank.reprimands },
+        plan.id,
+      );
     } else {
-      letter('battle-lost', 'The Marshal', `Defeat: ${plan.title}`, `Only ${Math.round(sl * 100)}% of the army's needs were met. The battle is lost.`, plan.id);
-      demote(R.levelsLostPerBattle, `The defeat at ${plan.title} is laid at your door.`);
+      letter(
+        'battle-lost',
+        'The Marshal',
+        `Defeat: ${plan.title}`,
+        `Only ${Math.round(sl * 100)}% of the army's needs were met. The battle is lost.`,
+        { serviceLevel: sl, merit: rank.merit, reprimands: rank.reprimands },
+        plan.id,
+      );
+      demote(R.levelsLostPerBattle, `The defeat at ${plan.title} is laid at your door.`, { serviceLevel: sl }, plan.id);
     }
   }
 
@@ -131,7 +165,10 @@ export function updateCareer(
     rank.level += 1;
     rank.merit = 0;
     rank.reprimands = 0;
-    letter('promotion', 'The Marshal', 'Promotion', `For a well-kept army and honest books you are raised to rank ${rank.level}.`);
+    letter('promotion', 'The Marshal', 'Promotion', `For a well-kept army and honest books you are raised to rank ${rank.level}.`, {
+      merit: 0,
+      reprimands: 0,
+    });
   }
 
   let status: GameStatus = state.status;
