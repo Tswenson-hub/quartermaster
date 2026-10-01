@@ -31,6 +31,7 @@ describe('golden: Monday order, on hand 100', () => {
       d1: 3,
       d2: 6,
       safetyStock: 0,
+      minimumFill: 40,
       mustOrderPoint: 40,
       canOrderPoint: 70,
       orderUpTo: 40,
@@ -160,7 +161,7 @@ describe('golden: deficit before D2 (lost sales must not hide demand D1..D2)', (
   // On hand 20, 20/day, MOP 16 (presentation). Mon order: D1 = 3, D2 = 6.
   // Days 0–2 clamp at 0 (sales before D1 are lost either way); days 3–5 need 60 more.
   const s = state({
-    locations: [loc('grain', { onHand: 20, history: flat(20), presentationStock: 16 })],
+    locations: [loc('grain', { onHand: 20, history: flat(20), minimumFill: 16 })],
   });
 
   it('projectedAtD2 = −60 and qty = MOP − (−60) = 76', () => {

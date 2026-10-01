@@ -44,10 +44,18 @@ export interface Vendor {
   /** Days from order to delivery at the depot. */
   leadTimeDays: number;
   /**
-   * Vendor minimum order, if any. `surcharge` (flat silver) applies when the player accepts
-   * an order below the minimum; without it a short order is not allowed.
+   * Vendor minimum order, if any (RELEX_RULES §4, §6).
+   * `surcharge` is DEPRECATED: the below-minimum surcharge path was removed by the owner. Stop reading
+   * and writing it; the lead deletes the field once no code uses it.
    */
-  minimum?: { kind: 'value' | 'units'; amount: number; surcharge?: number };
+  minimum?: { kind: 'value' | 'units'; amount: number; /** @deprecated removed by RELEX_RULES §4 */ surcharge?: number };
+  /**
+   * Default order trigger for a vendor with a minimum: the fraction (0–1+) of the minimum that the real
+   * need must reach before the system builds the order up to the minimum. Below it, no proposal is made
+   * for this vendor. Falls back to rules.vendorMinimum.defaultTrigger. The player can override it per
+   * vendor (GameState.vendorTriggers).
+   */
+  orderTrigger?: number;
   /** Probability (0–1) a delivery arrives on time and in full. 1 = never fails. */
   reliability: number;
 }
@@ -77,8 +85,11 @@ export interface ItemLocation {
   onHand: number;
   /** Target service level 0–1 used by safety-stock rule. */
   serviceLevel: number;
-  /** Minimum presentation / display stock (e.g. "always keep 1 cart at camp"). */
-  presentationStock: number;
+  /**
+   * Player-defined minimum fill (units), e.g. "always keep 1 cart at camp".
+   * RELEX_RULES §3: MOP = max(safety stock from forecast-error variance, minimumFill).
+   */
+  minimumFill: number;
   /**
    * FIFO stock lots, oldest first, for spoilage. When present, sum of qty = onHand.
    * Optional: when absent the engine treats all stock as received today.
@@ -92,13 +103,21 @@ export interface ItemLocation {
   history: number[];
 }
 
+/**
+ * Player forecast override (RELEX_RULES §8). On its days an override IS the forecast: it replaces
+ * baseline + battle-plan uplift until the player deletes it.
+ * - 'absolute': `value` is the daily quantity on every day from..to (one day when from === to).
+ * - 'aggregate': `value` is the TOTAL over from..to, broken out across the days in proportion to the
+ *   baseline forecast (flat if the baseline is all zero).
+ * - 'factor': `value` multiplies baseline + uplift (kept for compatibility).
+ * Overlapping overrides: later entries in GameState.overrides win, day by day.
+ */
 export type ForecastOverride = {
   itemId: ItemId;
   depotId: DepotId;
   from: Day;
   to: Day;
-  /** Absolute daily quantity OR multiplicative factor on baseline. */
-  mode: 'absolute' | 'factor';
+  mode: 'absolute' | 'aggregate' | 'factor';
   value: number;
 };
 
@@ -137,7 +156,7 @@ export interface OpenOrder {
   deliveryOn: Day;
   /** Total cost of the line, including `surcharge` if any. */
   cost: number;
-  /** Vendor-minimum surcharge (silver) carried on the first line of a below-minimum order; included in `cost`. */
+  /** @deprecated The below-minimum surcharge path was removed (RELEX_RULES §4). Lead deletes this once unused. */
   surcharge?: number;
 }
 
@@ -203,9 +222,93 @@ export interface DailyKpi {
   spoiled: number;
   holdingCost: number;
   spend: number;
-  /** Sum over locations of that day's forecast total as of that morning (for MAPE/bias). */
-  forecast?: number;
+  /** Sum over locations of that day's forecast total, as of that morning. */
+  forecast: number;
+  /** Sum over locations of |actual demand − forecast| that day. SWAPE = Σ absError / Σ demand (§10). */
+  absError: number;
+  /** End-of-day on hand ÷ next day's forecast, summed over locations (days of supply, §10). */
+  daysOfSupply: number;
 }
+
+/** Difficulty picks the market ticker (volatility) and budget tightness (rules.difficulty). */
+export type Difficulty = 'easy' | 'normal' | 'hard';
+
+/**
+ * Real market series that drives actual demand (RELEX_RULES §11). The store fetches it (Alpha Vantage
+ * TIME_SERIES_DAILY, cached once per calendar day, bundled snapshot fallback) and hands it to initGame.
+ * The engine only reads it; normalization lives in rules.market.
+ */
+export interface MarketSignal {
+  ticker: string;
+  source: 'live' | 'snapshot';
+  /** True when the snapshot is generated placeholder data, not real prices. */
+  synthetic?: boolean;
+  /** Trading dates (YYYY-MM-DD) of values[0] and of the last value. */
+  firstDate: string;
+  lastDate: string;
+  /** Daily closes, oldest first. values[d] drives demand on game day d. Length ≥ scenario.lengthDays. */
+  values: number[];
+}
+
+/** What the player picks when starting a game. */
+export interface GameSetup {
+  difficulty: Difficulty;
+  market: MarketSignal;
+}
+
+/** Vendor-minimum order trigger result for one vendor today (RELEX_RULES §4, §6). Computed by refresh. */
+export interface VendorPlan {
+  vendorId: VendorId;
+  /** Real need: value or units (per minimum.kind) of must-order lines after pack rounding. */
+  need: number;
+  /** Vendor minimum in the same unit, if any. */
+  minimum?: number;
+  /** Effective trigger: GameState.vendorTriggers ?? Vendor.orderTrigger ?? rules default. */
+  trigger: number;
+  /** need ÷ minimum (1 when there is no minimum). */
+  ratio: number;
+  /**
+   * 'no-minimum' | 'meets-minimum' (need ≥ minimum) | 'built' (ratio ≥ trigger, built up to the minimum
+   * one pack at a time of the item with the lowest days of cover at D2) | 'below-trigger' (no proposal).
+   */
+  status: 'no-minimum' | 'meets-minimum' | 'built' | 'below-trigger';
+}
+
+/** Career standing (RELEX_RULES §9, §11). Titles per level come from content. */
+export interface RankState {
+  /** 0 = lowest rank. Demotion below 0 ends the game. */
+  level: number;
+  /** Progress toward the next promotion (budget discipline, service level, battles won). */
+  merit: number;
+  /** Letters of reprimand received since the last promotion or demotion. */
+  reprimands: number;
+  /** Fiscal periods in a row that ended over budget. */
+  overspentStreak: number;
+}
+
+export type LetterKind = 'reprimand' | 'commendation' | 'promotion' | 'demotion' | 'battle-won' | 'battle-lost' | 'game-over';
+
+/** A letter from command, raised by the engine on rank and battle events. */
+export interface Letter {
+  id: string;
+  day: Day;
+  kind: LetterKind;
+  from: string;
+  subject: string;
+  body: string;
+  battlePlanId?: BattlePlanId;
+}
+
+/** Result of a battle plan's window, decided by service level to its depots during the window. */
+export interface BattleOutcome {
+  battlePlanId: BattlePlanId;
+  /** Day the outcome was decided (the day after the window ends). */
+  day: Day;
+  won: boolean;
+  serviceLevel: number;
+}
+
+export type GameStatus = 'playing' | 'complete' | 'lost';
 
 export interface GameState {
   seed: number;
@@ -223,7 +326,34 @@ export interface GameState {
   exceptions: PlanningException[];
   kpis: DailyKpi[];
   morale: number; // 0–100
+  difficulty: Difficulty;
+  market: MarketSignal;
+  /** Player overrides of vendor order triggers (RELEX_RULES §4). Absent = vendor/rules default. */
+  vendorTriggers: Record<VendorId, number>;
+  /** Today's vendor-minimum trigger results, one per vendor with a proposal or a minimum. */
+  vendorPlans: VendorPlan[];
+  rank: RankState;
+  /** Letters from command, oldest first. */
+  letters: Letter[];
+  battles: BattleOutcome[];
+  status: GameStatus;
 }
+
+/** GameState fields built by initGame, not provided by scenarios. */
+export type RuntimeField =
+  | 'today'
+  | 'proposals'
+  | 'exceptions'
+  | 'kpis'
+  | 'openOrders'
+  | 'difficulty'
+  | 'market'
+  | 'vendorTriggers'
+  | 'vendorPlans'
+  | 'rank'
+  | 'letters'
+  | 'battles'
+  | 'status';
 
 /** Static content a scenario/campaign level provides to build the initial GameState. */
 export interface Scenario {
@@ -235,8 +365,10 @@ export interface Scenario {
   lengthDays: number;
   periodLengthDays: number;
   periodAllowance: number;
-  initial: Omit<GameState, 'today' | 'proposals' | 'exceptions' | 'kpis' | 'openOrders'> & {
+  initial: Omit<GameState, RuntimeField> & {
     openOrders?: OpenOrder[];
+    /** Starting rank level; default rules.rank.startLevel. */
+    rankLevel?: number;
   };
 }
 
@@ -266,6 +398,8 @@ export interface PlanningParams {
   d1: Day;
   d2: Day;
   safetyStock: number;
+  minimumFill: number;
+  /** max(safetyStock, minimumFill) (RELEX_RULES §3). */
   mustOrderPoint: number;
   canOrderPoint: number;
   orderUpTo: number;
@@ -279,8 +413,12 @@ export interface PlanningParams {
 }
 
 export interface EngineApi {
-  /** Build day-0 state from a scenario: periods, empty kpis/exceptions, proposals + exceptions computed. */
-  initGame(scenario: Scenario): GameState;
+  /**
+   * Build day-0 state from a scenario and the player's setup: periods (allowance × difficulty
+   * budgetFactor), rank, empty kpis/letters, proposals + vendorPlans + exceptions computed.
+   * Without a setup: 'normal' difficulty and a flat market (tests).
+   */
+  initGame(scenario: Scenario, setup?: GameSetup): GameState;
   /**
    * Recompute derived state for `today` (proposals, exceptions) after the player changes
    * inputs (e.g. overrides). Must not advance time or consume RNG.
@@ -301,8 +439,9 @@ export interface EngineApi {
    */
   placeOrders(state: GameState, decisions: ProposalDecisionInput[]): GameState;
   /**
-   * Advance one day: receive deliveries, consume (seeded) actual demand, spoilage, holding
-   * cost, budget/morale, KPIs. Returns state with today+1 and fresh proposals + exceptions.
+   * Advance one day: receive deliveries, consume actual demand (market signal + seeded noise),
+   * spoilage, holding cost, budget/morale, KPIs, rank/letters/battle outcomes, status. Returns state
+   * with today+1 and fresh proposals + vendorPlans + exceptions. No-op once status !== 'playing'.
    */
   tick(state: GameState): GameState;
 }

@@ -3,10 +3,10 @@ import { forecast } from './forecast';
 import { project } from './projection';
 import { planningParams } from './replenishment';
 import { initGame, placeOrders, refresh, tick } from './tick';
-import type { EngineApi } from './types';
+import type { EngineApi, GameSetup, Scenario } from './types';
 
 export const engine = {
-  initGame: (scenario) => initGame(scenario),
+  initGame: (scenario: Scenario, setup?: GameSetup) => initGame(scenario, setup),
   refresh: (state) => refresh(state),
   forecast: (state, itemId, depotId, from, to) => forecast(state, itemId, depotId, from, to),
   planningParams: (state, itemId, depotId) => planningParams(state, itemId, depotId),

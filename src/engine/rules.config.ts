@@ -1,6 +1,8 @@
 // Every tunable RELEX rule lives here. The spec is docs/RELEX_RULES.md — keep the two in sync.
 // Engine modules read rules from this object; never hard-code a rule elsewhere.
 
+import type { Difficulty } from './types';
+
 export interface SafetyStockInput {
   serviceLevel: number;
   /** Std-dev of daily forecast error. */
@@ -79,6 +81,39 @@ export interface Rules {
    * order on its due day. A failed order arrives lateDaysMin..lateDaysMax days late, in full.
    */
   delivery: { lateDaysMin: number; lateDaysMax: number };
+  /**
+   * §4/§6 vendor minimum order trigger. If real need ÷ minimum ≥ trigger, build the order up to the
+   * minimum one pack at a time (item with lowest projected days of cover at D2, re-ranked after each
+   * pack); below the trigger, no proposal for that vendor. Default trigger when the vendor sets none.
+   */
+  vendorMinimum: { defaultTrigger: number };
+  /**
+   * §11 market-driven demand. Each day's demand rate = base rate × factor, where
+   * factor = clamp((close[d] ÷ mean(close)) ^ sensitivity, minFactor, maxFactor), then seeded noise.
+   */
+  market: { sensitivity: number; minFactor: number; maxFactor: number };
+  /** §11 difficulty: market ticker (volatility) and budget tightness (allowance × budgetFactor). */
+  difficulty: Record<Difficulty, { ticker: string; label: string; budgetFactor: number }>;
+  /** §9/§11 rank, reprimands, promotions, battles. */
+  rank: {
+    startLevel: number;
+    /** Highest level (titles 0..maxLevel come from content). */
+    maxLevel: number;
+    /** A period over budget by more than this fraction of allowance earns a letter of reprimand. */
+    reprimandOverspendPct: number;
+    /** This many reprimands → demotion (reprimands reset). */
+    reprimandsPerDemotion: number;
+    /** Merit for a period on budget with service level ≥ meritServiceLevel. */
+    meritPerGoodPeriod: number;
+    meritServiceLevel: number;
+    meritPerBattleWon: number;
+    /** Merit needed for a promotion (merit resets). */
+    promotionMerit: number;
+    /** Service level to a battle plan's depots during its window needed to win the battle. */
+    battleWinServiceLevel: number;
+    /** A lost battle costs this many levels. */
+    levelsLostPerBattle: number;
+  };
 }
 
 /** Inverse standard normal approximation (Acklam) — good enough for service-level z. */
@@ -116,4 +151,23 @@ export const rules: Rules = {
   exceptions: { forecastDeviationPct: 0.3 },
   spoilage: { mode: 'lots' },
   delivery: { lateDaysMin: 1, lateDaysMax: 2 },
+  vendorMinimum: { defaultTrigger: 0.6 },
+  market: { sensitivity: 1.5, minFactor: 0.5, maxFactor: 1.8 },
+  difficulty: {
+    easy: { ticker: 'KO', label: 'Garrison duty', budgetFactor: 1.15 },
+    normal: { ticker: 'AAPL', label: 'Field campaign', budgetFactor: 1 },
+    hard: { ticker: 'TSLA', label: 'Winter siege', budgetFactor: 0.85 },
+  },
+  rank: {
+    startLevel: 2,
+    maxLevel: 6,
+    reprimandOverspendPct: 0.05,
+    reprimandsPerDemotion: 2,
+    meritPerGoodPeriod: 1,
+    meritServiceLevel: 0.95,
+    meritPerBattleWon: 2,
+    promotionMerit: 3,
+    battleWinServiceLevel: 0.9,
+    levelsLostPerBattle: 1,
+  },
 };

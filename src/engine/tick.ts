@@ -7,6 +7,7 @@ import { addLot, consume, expire, lotsOf } from './lots';
 import { createRng, hashSeed, rngForDay } from './rng';
 import { rules as defaultRules, type Rules } from './rules.config';
 import type {
+  GameSetup,
   Day,
   ExceptionKind,
   FiscalPeriod,
@@ -43,8 +44,10 @@ function buildPeriods(scenario: Scenario): FiscalPeriod[] {
   }));
 }
 
-export function initGame(scenario: Scenario, r: Rules = defaultRules): GameState {
-  const { openOrders, ...initial } = scenario.initial;
+export function initGame(scenario: Scenario, setup?: GameSetup, r: Rules = defaultRules): GameState {
+  const { openOrders, rankLevel, ...initial } = scenario.initial;
+  // TODO(engine): placeholder defaults added by lead with the M2 contract. Engine owns: allowance ×
+  // rules.difficulty[d].budgetFactor, market-driven demand, vendorPlans, rank/letters/battles, status.
   const state: GameState = {
     ...initial,
     today: 0,
@@ -53,6 +56,21 @@ export function initGame(scenario: Scenario, r: Rules = defaultRules): GameState
     proposals: [],
     exceptions: [],
     kpis: [],
+    difficulty: setup?.difficulty ?? 'normal',
+    market: setup?.market ?? {
+      ticker: 'FLAT',
+      source: 'snapshot',
+      synthetic: true,
+      firstDate: '',
+      lastDate: '',
+      values: Array<number>(scenario.lengthDays).fill(1),
+    },
+    vendorTriggers: {},
+    vendorPlans: [],
+    rank: { level: rankLevel ?? r.rank.startLevel, merit: 0, reprimands: 0, overspentStreak: 0 },
+    letters: [],
+    battles: [],
+    status: 'playing',
   };
   return refresh(state, r);
 }
@@ -202,7 +220,8 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
   const rng = rngForDay(state.seed, t);
   const events: PlanningException[] = [];
   let morale = state.morale;
-  const kpi = { day: t, demand: 0, fulfilled: 0, spoiled: 0, holdingCost: 0, spend: 0, forecast: 0 };
+  // TODO(engine): fill absError (Σ|A−F|) and daysOfSupply (§10); lead added them as 0 with the M2 contract.
+  const kpi = { day: t, demand: 0, fulfilled: 0, spoiled: 0, holdingCost: 0, spend: 0, forecast: 0, absError: 0, daysOfSupply: 0 };
 
   for (const o of state.openOrders) if (o.orderedOn === t) kpi.spend += o.cost;
 
