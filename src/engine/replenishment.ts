@@ -1,9 +1,19 @@
 // MOP, COP, order-up-to, pack rounding and order proposals (docs/RELEX_RULES.md §3–5, §7).
-import { deliveryDates, isOrderDay, reviewPeriodDays } from './calendar';
-import { forecastErrorStdDev, forecastLocation } from './forecast';
+import { deliveryDates, nextOrderDayFrom, reviewPeriodDays } from './calendar';
+import { findLocation, forecastErrorStdDev, forecastLocation } from './forecast';
 import { projectStock, receiptsByDay } from './projection';
 import { rules as defaultRules, type Rules } from './rules.config';
-import type { GameState, ItemLocation, OrderProposal, SourcingRule, Vendor } from './types';
+import type {
+  Day,
+  DepotId,
+  GameState,
+  ItemId,
+  ItemLocation,
+  OrderProposal,
+  PlanningParams,
+  SourcingRule,
+  Vendor,
+} from './types';
 
 /** Round a raw need to the pack size per rules.packRounding. Need ≤ 0 → 0. */
 export function roundToPack(need: number, packSize: number, r: Rules = defaultRules): number {
@@ -17,47 +27,59 @@ export function roundToPack(need: number, packSize: number, r: Rules = defaultRu
 }
 
 /**
- * Source for an item today (§7 default): the highest-priority vendor (lowest `priority`,
- * then vendorId) whose order day is today. Split sourcing is not applied yet.
+ * Source for an item's next order opportunity (§7 default): the vendor with the earliest
+ * order day on or after today; ties go to the preferred source (lowest `priority`, then
+ * vendorId). Split sourcing is not applied yet.
  */
-export function chooseSource(state: GameState, itemId: string): { rule: SourcingRule; vendor: Vendor } | undefined {
-  const rules = state.sourcing
-    .filter((s) => s.itemId === itemId && state.vendors[s.vendorId])
-    .sort((a, b) => a.priority - b.priority || a.vendorId.localeCompare(b.vendorId));
-  for (const rule of rules) {
+export function chooseSource(
+  state: GameState,
+  itemId: string,
+): { rule: SourcingRule; vendor: Vendor; orderDay: Day } | undefined {
+  let best: { rule: SourcingRule; vendor: Vendor; orderDay: Day } | undefined;
+  for (const rule of state.sourcing) {
     const vendor = state.vendors[rule.vendorId];
-    if (isOrderDay(vendor, state.today)) return { rule, vendor };
+    if (rule.itemId !== itemId || !vendor || vendor.orderDays.length === 0) continue;
+    const orderDay = nextOrderDayFrom(vendor, state.today);
+    if (
+      !best ||
+      orderDay < best.orderDay ||
+      (orderDay === best.orderDay &&
+        (rule.priority < best.rule.priority ||
+          (rule.priority === best.rule.priority && rule.vendorId < best.rule.vendorId)))
+    ) {
+      best = { rule, vendor, orderDay };
+    }
   }
-  return undefined;
+  return best;
 }
 
-/** Everything the replenishment rule computes for one item-location and source today. */
-export interface PlanLine {
-  proposal: OrderProposal;
-  /** Mean forecast over today..D2 measure day, used for COP and days of cover. */
+/** PlanningParams plus the intermediate values the proposal and vendor-min logic need. */
+export interface PlanningDetail extends PlanningParams {
+  /** Mean forecast over orderDay..D2 measure day; used for COP, order-up-to, days of cover. */
   avgDailyForecast: number;
-  orderUpTo: number;
-  safetyStock: number;
-  packSize: number;
-  unitCost: number;
+  rule: SourcingRule;
 }
 
-/** Plan one item-location against a given source, ordering today. Returns undefined if above COP. */
-export function planLine(
+/**
+ * MOP/COP/order-up-to and projection at D2 for an order placed with `vendor` on `orderDay`
+ * (≥ today). The projection runs from today and includes all open orders, but not this order.
+ */
+export function computePlanning(
   state: GameState,
   loc: ItemLocation,
   rule: SourcingRule,
   vendor: Vendor,
+  orderDay: Day,
   r: Rules = defaultRules,
-): PlanLine | undefined {
-  const today = state.today;
-  const { d1, d2 } = deliveryDates(vendor, today);
+): PlanningDetail {
+  const { d1, d2 } = deliveryDates(vendor, orderDay);
   const measureDay = r.projection.measureAtD2 === 'before-d2-receipt' ? d2 - 1 : d2;
 
-  const totals = forecastLocation(state, loc, today, measureDay, r).map((p) => p.total);
+  const totals = forecastLocation(state, loc, state.today, measureDay, r).map((p) => p.total);
   const proj = projectStock(loc.onHand, totals, receiptsByDay(state, loc, measureDay), r.projection.lostSales);
   const projectedAtD2 = proj[proj.length - 1];
-  const avgDailyForecast = totals.reduce((a, b) => a + b, 0) / totals.length;
+  const window = totals.slice(orderDay - state.today);
+  const avgDailyForecast = window.reduce((a, b) => a + b, 0) / window.length;
 
   const safetyStock = Math.max(
     0,
@@ -65,59 +87,98 @@ export function planLine(
       serviceLevel: loc.serviceLevel,
       forecastErrorStdDev: forecastErrorStdDev(loc.history, r),
       leadTimeDays: vendor.leadTimeDays,
-      reviewPeriodDays: reviewPeriodDays(vendor, today),
+      reviewPeriodDays: reviewPeriodDays(vendor, orderDay),
       avgDailyForecast,
     }),
   );
   const mustOrderPoint = safetyStock + loc.presentationStock;
-  const canOrderPoint = mustOrderPoint + r.canOrderPoint.extraDaysOfCover * avgDailyForecast;
-  const orderUpTo = mustOrderPoint + r.orderUpToExtraDays * avgDailyForecast;
+  return {
+    itemId: loc.itemId,
+    depotId: loc.depotId,
+    vendorId: vendor.id,
+    orderDay,
+    d1,
+    d2,
+    safetyStock,
+    mustOrderPoint,
+    canOrderPoint: mustOrderPoint + r.canOrderPoint.extraDaysOfCover * avgDailyForecast,
+    orderUpTo: mustOrderPoint + r.orderUpToExtraDays * avgDailyForecast,
+    projectedAtD2,
+    avgDailyForecast,
+    rule,
+  };
+}
 
+/** Planning detail for an item-location at its next order opportunity; undefined if unsourced. */
+export function planningDetail(state: GameState, loc: ItemLocation, r: Rules = defaultRules): PlanningDetail | undefined {
+  const source = chooseSource(state, loc.itemId);
+  return source && computePlanning(state, loc, source.rule, source.vendor, source.orderDay, r);
+}
+
+export function planningParams(
+  state: GameState,
+  itemId: ItemId,
+  depotId: DepotId,
+  r: Rules = defaultRules,
+): PlanningParams | undefined {
+  const detail = planningDetail(state, findLocation(state, itemId, depotId), r);
+  if (!detail) return undefined;
+  const { avgDailyForecast: _avg, rule: _rule, ...params } = detail;
+  return params;
+}
+
+/** A proposal line plus what vendor-minimum fill needs to rank and grow it. */
+export interface PlanLine {
+  proposal: OrderProposal;
+  avgDailyForecast: number;
+  packSize: number;
+  unitCost: number;
+}
+
+/** Proposal for a planning detail ordering today; undefined if projected stock is at/above COP. */
+export function planLine(p: PlanningDetail, r: Rules = defaultRules): PlanLine | undefined {
   let reason: OrderProposal['reason'];
   let qty = 0;
-  if (projectedAtD2 < mustOrderPoint) {
+  if (p.projectedAtD2 < p.mustOrderPoint) {
     reason = 'must';
-    qty = roundToPack(orderUpTo - projectedAtD2, rule.packSize, r);
-    if (qty === 0 && r.mustOrderMinOnePack) qty = Math.max(1, rule.packSize);
-  } else if (projectedAtD2 < canOrderPoint) {
+    qty = roundToPack(p.orderUpTo - p.projectedAtD2, p.rule.packSize, r);
+    if (qty === 0 && r.mustOrderMinOnePack) qty = Math.max(1, p.rule.packSize);
+  } else if (p.projectedAtD2 < p.canOrderPoint) {
     reason = 'can';
   } else {
     return undefined;
   }
-
   return {
     proposal: {
-      itemId: loc.itemId,
-      depotId: loc.depotId,
-      vendorId: vendor.id,
+      itemId: p.itemId,
+      depotId: p.depotId,
+      vendorId: p.vendorId,
       qty,
       reason,
-      d1,
-      d2,
-      projectedAtD2,
-      mustOrderPoint,
-      canOrderPoint,
-      cost: qty * rule.unitCost,
+      d1: p.d1,
+      d2: p.d2,
+      projectedAtD2: p.projectedAtD2,
+      mustOrderPoint: p.mustOrderPoint,
+      canOrderPoint: p.canOrderPoint,
+      cost: qty * p.rule.unitCost,
     },
-    avgDailyForecast,
-    orderUpTo,
-    safetyStock,
-    packSize: rule.packSize,
-    unitCost: rule.unitCost,
+    avgDailyForecast: p.avgDailyForecast,
+    packSize: p.rule.packSize,
+    unitCost: p.rule.unitCost,
   };
 }
 
 /**
  * Raw proposals for today, before vendor-minimum fill: one line per item-location whose
- * source orders today and whose projection at D2 is below COP. `must` lines carry a qty;
+ * next order opportunity is today and whose projection at D2 is below COP. `must` lines carry a qty;
  * `can` lines have qty 0 (candidates for vendor-minimum fill).
  */
 export function generatePlanLines(state: GameState, r: Rules = defaultRules): PlanLine[] {
   const lines: PlanLine[] = [];
   for (const loc of state.locations) {
-    const source = chooseSource(state, loc.itemId);
-    if (!source) continue;
-    const line = planLine(state, loc, source.rule, source.vendor, r);
+    const detail = planningDetail(state, loc, r);
+    if (!detail || detail.orderDay !== state.today) continue;
+    const line = planLine(detail, r);
     if (line) lines.push(line);
   }
   return lines;
