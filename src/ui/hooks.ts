@@ -4,8 +4,17 @@
 
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import type { Day, DepotId, FiscalPeriod, GameState, ItemId, OrderProposal, PlanningException, ProposalDecision, Scenario, SourcingRule, Vendor } from '../engine/types';
-import { isScenarioOver, selectCurrentPeriod, selectExceptionsToday, selectForecast, selectProjection, useGameStore } from '../store';
+import type { Day, DepotId, FiscalPeriod, GameState, ItemId, OrderProposal, PlanningException, PlanningParams, ProposalDecision, Scenario, SourcingRule, Vendor } from '../engine/types';
+import {
+  isScenarioOver,
+  selectCurrentPeriod,
+  selectExceptionsToday,
+  selectForecast,
+  selectPlanningParams,
+  selectProjection,
+  selectServiceLevel,
+  useGameStore,
+} from '../store';
 import { sandboxScenario } from './mock/sandboxScenario';
 import { useUiStore } from './uiStore';
 
@@ -61,8 +70,8 @@ export interface PlanningView {
   today: Day;
   onHand: number;
   points: PlanningPoint[];
-  mustOrderPoint?: number;
-  canOrderPoint?: number;
+  /** MOP/COP/D1/D2 at the next order opportunity; undefined if the item has no source. */
+  params?: PlanningParams;
   /** Today's proposal for this item-location, if any (carries D1/D2). */
   proposal?: OrderProposal;
 }
@@ -91,10 +100,7 @@ export function usePlanningView(itemId: ItemId, depotId: DepotId, pastDays = 21,
       today: game.today,
       onHand: loc.onHand,
       points,
-      // TODO(lead): MOP/COP only arrive on proposals; a selectPlanningParams selector would let
-      // the chart draw them for items with no order today.
-      mustOrderPoint: proposal?.mustOrderPoint,
-      canOrderPoint: proposal?.canOrderPoint,
+      params: selectPlanningParams(game, itemId, depotId),
       proposal,
     };
   }, [game, itemId, depotId, pastDays, futureDays]);
@@ -199,13 +205,8 @@ export function useExceptionsToday(): PlanningException[] {
   return useMemo(() => (game ? selectExceptionsToday(game) : []), [game]);
 }
 
-/** Fill rate to date (fulfilled ÷ demand across all KPIs), 0–100. 100 before any demand. */
+/** Service level to date as a percentage (0–100). */
 export function useServiceLevel(): number {
   const game = useGame();
-  return useMemo(() => {
-    if (!game) return 100;
-    const demand = game.kpis.reduce((a, k) => a + k.demand, 0);
-    const fulfilled = game.kpis.reduce((a, k) => a + k.fulfilled, 0);
-    return demand > 0 ? Math.round((fulfilled / demand) * 1000) / 10 : 100;
-  }, [game]);
+  return useMemo(() => (game ? Math.round(selectServiceLevel(game) * 1000) / 10 : 100), [game]);
 }
