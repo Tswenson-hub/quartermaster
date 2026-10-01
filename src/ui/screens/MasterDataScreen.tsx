@@ -214,7 +214,15 @@ const ITEM_COLUMNS: Column<ItemLocationRow>[] = [
     text: 'Unit cost',
     num: true,
     sort: (r) => r.stats.unitCost ?? -1,
-    cell: (r) => dash(r.stats.unitCost, (n) => fmtSilver(n)),
+    // A transfer lane's unit cost only values the stock; transfers are never spend.
+    cell: (r) =>
+      isTransferLane(r.vendor) ? (
+        <span className="muted" title="Transfers cost nothing against the budget; this only values the stock">
+          {dash(r.stats.unitCost, (n) => fmtSilver(n))} <span className="small">valuation</span>
+        </span>
+      ) : (
+        dash(r.stats.unitCost, (n) => fmtSilver(n))
+      ),
   },
 ];
 
