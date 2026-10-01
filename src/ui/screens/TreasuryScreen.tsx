@@ -53,7 +53,7 @@ export function TreasuryScreen() {
 
       <div className="two-col">
         <Panel title="Daily spend" flavour="Silver paid out this period.">
-          {spendDays.length ? (
+          {spendDays.some((k) => k.spend > 0) ? (
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={spendDays} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke="#c9b38a" strokeDasharray="2 4" vertical={false} />

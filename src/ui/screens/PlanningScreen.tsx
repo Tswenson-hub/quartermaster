@@ -20,31 +20,37 @@ export function PlanningScreen() {
   return (
     <div className="screen-grid planning-grid">
       <Panel title="Ledger" flavour="Every store in every camp." className="ledger">
-        <ul className="ledger-list">
-          {game.locations.map((l) => {
-            const item = game.items[l.itemId];
-            const urgent = game.proposals.some((p) => p.itemId === l.itemId && p.depotId === l.depotId && p.reason === 'must');
+        <div className="ledger-scroll">
+          {Object.values(game.depots).map((depot) => {
+            const locs = game.locations.filter((l) => l.depotId === depot.id);
+            if (!locs.length) return null;
             return (
-              <li key={keyOf(l)}>
-                <button
-                  type="button"
-                  className={`ledger-row ${keyOf(l) === keyOf(current) ? 'active' : ''}`}
-                  onClick={() => planItem(l.itemId, l.depotId)}
-                >
-                  <ItemIcon item={item} size={28} />
-                  <span className="ledger-name">
-                    {item?.name}
-                    <span className="muted">{game.depots[l.depotId]?.name}</span>
-                  </span>
-                  <span className="ledger-qty">
-                    {fmtQty(l.onHand)}
-                    {urgent && <span className="pill pill-must">must</span>}
-                  </span>
-                </button>
-              </li>
+              <div key={depot.id} className="ledger-depot">
+                <h3 className="ledger-depot-name">{depot.name}</h3>
+                <ul className="ledger-list">
+                  {locs.map((l) => {
+                    const item = game.items[l.itemId];
+                    const urgent = game.proposals.some((p) => p.itemId === l.itemId && p.depotId === l.depotId && p.reason === 'must');
+                    return (
+                      <li key={keyOf(l)}>
+                        <button
+                          type="button"
+                          className={`ledger-row ${keyOf(l) === keyOf(current) ? 'active' : ''}`}
+                          onClick={() => planItem(l.itemId, l.depotId)}
+                        >
+                          <ItemIcon item={item} size={24} />
+                          <span className="ledger-name">{item?.name}</span>
+                          {urgent && <span className="pill pill-must">must</span>}
+                          <span className="ledger-qty">{fmtQty(l.onHand)}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             );
           })}
-        </ul>
+        </div>
       </Panel>
       <ItemDetail game={game} loc={current} key={keyOf(current)} />
     </div>

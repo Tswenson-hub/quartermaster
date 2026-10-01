@@ -78,7 +78,10 @@ interface ScenarioSpec {
   seed: number;
   lengthDays: number;
   periodLengthDays: number;
-  /** Period allowance as a multiple of expected base spend (no battle-plan uplift). */
+  /**
+   * Period allowance as a multiple of expected base spend (no battle-plan uplift). Tuned so an
+   * accept-all player uses ~60–80% of it in levels I–VI and runs slightly over in level VII.
+   */
   allowanceFactor: number;
   vendorIds: VendorId[];
   lines: LineSpec[];
@@ -116,10 +119,13 @@ function scenarioSourcing(itemIds: ItemId[], vendorIds: VendorId[], lines: LineS
   return out;
 }
 
+/** Fiscal periods; a final period cut short by the scenario end gets a pro-rated allowance. */
 function buildPeriods(lengthDays: number, periodLengthDays: number, allowance: number): FiscalPeriod[] {
   const periods: FiscalPeriod[] = [];
   for (let start = 0, index = 0; start < lengthDays; start += periodLengthDays, index++) {
-    periods.push({ index, start, end: Math.min(start + periodLengthDays, lengthDays) - 1, allowance, committed: 0 });
+    const end = Math.min(start + periodLengthDays, lengthDays) - 1;
+    const prorated = Math.round((allowance * (end - start + 1)) / periodLengthDays / 10) * 10;
+    periods.push({ index, start, end, allowance: prorated, committed: 0 });
   }
   return periods;
 }
@@ -228,7 +234,7 @@ const tutorial: ScenarioSpec[] = [
     seed: 1303,
     lengthDays: 28,
     periodLengthDays: 28,
-    allowanceFactor: 1.4,
+    allowanceFactor: 1.1,
     vendorIds: ['abbey-granary'],
     lines: [
       { itemId: 'grain', depotId: 'harrowmere', demand: { cv: 0.12 }, onHandDays: 7, serviceLevel: 0.98, presentationStock: 20 },
@@ -247,7 +253,7 @@ const tutorial: ScenarioSpec[] = [
     seed: 1404,
     lengthDays: 28,
     periodLengthDays: 28,
-    allowanceFactor: 1.35,
+    allowanceFactor: 1.15,
     vendorIds: ['abbey-granary', 'river-merchants'],
     lines: [
       { itemId: 'ale', depotId: 'eastern-camp', sources: ['abbey-granary'], onHandDays: 5 },
@@ -268,7 +274,7 @@ const tutorial: ScenarioSpec[] = [
     seed: 1505,
     lengthDays: 28,
     periodLengthDays: 28,
-    allowanceFactor: 1.4,
+    allowanceFactor: 1.1,
     vendorIds: ['guild-fletchers', 'mountain-smithy'],
     lines: [
       { itemId: 'arrows', depotId: 'northern-pass', demand: { mean: 8 }, onHandDays: 9 },
@@ -310,10 +316,11 @@ const tutorial: ScenarioSpec[] = [
     seed: 1707,
     lengthDays: 56,
     periodLengthDays: 28,
-    allowanceFactor: 1.05,
+    allowanceFactor: 1.1,
     vendorIds: ['abbey-granary', 'river-merchants', 'guild-fletchers', 'royal-armory', 'apothecary'],
     lines: [
-      { itemId: 'arrows', depotId: 'harrowmere', onHandDays: 9 },
+      // Guild only: level VI already taught fallback sourcing; here the budget is about the letters.
+      { itemId: 'arrows', depotId: 'harrowmere', sources: ['guild-fletchers'], onHandDays: 9 },
       { itemId: 'pitch', depotId: 'harrowmere', onHandDays: 8 },
       { itemId: 'siege-rope', depotId: 'harrowmere', onHandDays: 12 },
       { itemId: 'bandages', depotId: 'harrowmere', onHandDays: 4 },
@@ -348,7 +355,7 @@ const sandbox: ScenarioSpec = {
   seed: 9001,
   lengthDays: 112,
   periodLengthDays: 28,
-  allowanceFactor: 1.15,
+  allowanceFactor: 1.35,
   vendorIds: Object.keys(VENDORS),
   lines: sandboxLines,
   battlePlanIds: ['harrowmere-assault', 'feast-muster', 'winter-crossing', 'ford-feint'],

@@ -27,6 +27,7 @@ export function NavRail() {
         <button
           key={t.id}
           type="button"
+          data-testid={`nav-${t.id}`}
           className={`nav-tab ${screen === t.id ? 'active' : ''}`}
           aria-current={screen === t.id ? 'page' : undefined}
           onClick={() => go(t.id)}
