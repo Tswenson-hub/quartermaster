@@ -102,9 +102,10 @@ Checked against the real engine with two strategies. **Accept-all** accepts ever
 | ford-feint | eastern-camp | d70 → d80–84 | arrows 1.8, bolts 1.8, bowstrings 1.33 | 1.85, 1.7, 1.35 | accurate |
 | levies-arrive | eastern-camp | d3 → d14–34 | *(no figures)* | grain 1.75, ale 1.8, bandages 1.4 | **silent**: needs a forecast override |
 
-Each plan ends in a battle (`BATTLES` in `battlePlans.ts`): its name, key items, victory and
-defeat lines, and a proposed per-battle `winServiceLevel` (0.85–0.92). The engine currently uses a
-single global value, `rules.rank.battleWinServiceLevel` (0.9).
+Each plan ends in a battle. `BattlePlan.winServiceLevel` is the service level its depots need
+over the window to win: the assault needs 0.92, the feast 0.85, and the others 0.9. `BATTLES` in
+`battlePlans.ts` holds the flavour: name, key items, and victory and defeat lines (rendered by the
+store's `selectLetterText`).
 
 ## Tutorial campaign
 
