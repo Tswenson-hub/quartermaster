@@ -88,13 +88,19 @@ function ItemDetail({ game, loc }: { game: GameState; loc: ItemLocation }) {
             <Term k="projected">Projected stock</Term> just before the <Term k="d2" /> delivery ({fmtDay(params.d2)}) is{' '}
             <strong>{fmtQty(params.projectedAtD2)}</strong> — {belowMop ? 'below' : 'above'} the <Term k="mop" /> of{' '}
             <strong>{fmtQty(params.mustOrderPoint)}</strong>.{' '}
-            {belowMop ? 'You must order today or the men go without.' : 'No order needed to stay safe.'}
+            {params.projectedAtD2 < 0 && (
+              <>
+                That is <Term k="shortfall">{`${fmtQty(-params.projectedAtD2)} ${item.unit}s short`}</Term>: the men go
+                hungry.{' '}
+              </>
+            )}
+            {!belowMop ? 'No order needed to stay safe.' : params.projectedAtD2 < 0 ? 'You must order today.' : 'You must order today or the men go without.'}
           </p>
         )}
         <PlanningCharts view={view} unit={item.unit} battlePlans={game.battlePlans.filter((b) => b.announcedOn <= game.today && b.depotIds.includes(loc.depotId))} />
         <p className="chart-note muted">
           Shaded days are battle-plan windows. The dot is the stock just before the D2 delivery: the level this order must
-          keep above the MOP.
+          keep above the MOP. A red bar below zero is demand that would go unmet.
         </p>
       </Panel>
 

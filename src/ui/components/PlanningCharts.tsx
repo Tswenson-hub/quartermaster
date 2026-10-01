@@ -82,9 +82,22 @@ export function PlanningCharts({ view, unit, battlePlans }: Props) {
                 <ReferenceLine y={params.mustOrderPoint} stroke={MOP} strokeDasharray="6 4" strokeWidth={2} label={{ value: 'MOP', position: 'right', fill: MOP, fontSize: 12 }} />
                 <ReferenceLine x={params.d1} stroke={MUTED} strokeDasharray="2 3" label={{ value: 'D1', position: 'top', fill: INK, fontSize: 12 }} />
                 <ReferenceLine x={params.d2} stroke={INK} strokeDasharray="2 3" label={{ value: 'D2', position: 'top', fill: INK, fontSize: 12 }} />
+{params.projectedAtD2 < 0 && (
+                  // Unmet demand: physical stock stops at 0; the shortfall hangs below it.
+                  <ReferenceArea
+                    x1={(d2CheckDay ?? params.d2) - 0.35}
+                    x2={(d2CheckDay ?? params.d2) + 0.35}
+                    y1={params.projectedAtD2}
+                    y2={0}
+                    fill={MOP}
+                    fillOpacity={0.75}
+                    ifOverflow="extendDomain"
+                    label={{ value: `${fmtQty(-params.projectedAtD2)} short`, position: 'right', fill: MOP, fontSize: 12 }}
+                  />
+                )}
                 <ReferenceDot
                   x={d2CheckDay ?? params.d2}
-                  y={params.projectedAtD2}
+                  y={Math.max(0, params.projectedAtD2)}
                   r={6}
                   fill={params.projectedAtD2 < params.mustOrderPoint ? MOP : SERIES.projected}
                   stroke="#efe0bd"

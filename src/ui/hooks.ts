@@ -8,6 +8,7 @@ import type { Day, DepotId, FiscalPeriod, GameState, ItemId, OrderProposal, Plan
 import {
   isScenarioOver,
   selectCurrentPeriod,
+  selectD2CheckDay,
   selectDecisionPreview,
   selectExceptionsToday,
   selectForecast,
@@ -17,7 +18,6 @@ import {
   useGameStore,
 } from '../store';
 import { scenarios } from '../content';
-import { rules } from '../engine/rules.config';
 import { useUiStore } from './uiStore';
 
 /** Playable levels, tutorial first. */
@@ -70,15 +70,10 @@ export interface PlanningView {
   points: PlanningPoint[];
   /** MOP/COP/D1/D2 at the next order opportunity; undefined if the item has no source. */
   params?: PlanningParams;
-  /** Day whose end-of-day projection is compared to the MOP (per rules.projection.measureAtD2). */
+  /** Day whose end-of-day projection is compared to the MOP (store's selectD2CheckDay). */
   d2CheckDay?: Day;
   /** Today's proposal for this item-location, if any (carries D1/D2). */
   proposal?: OrderProposal;
-}
-
-/** 'before-d2-receipt' reads the projection at the end of day D2−1, just before the D2 delivery. */
-export function d2CheckDay(d2: Day): Day {
-  return rules.projection.measureAtD2 === 'before-d2-receipt' ? d2 - 1 : d2;
 }
 
 export function usePlanningView(itemId: ItemId, depotId: DepotId, pastDays = 21, futureDays = 21): PlanningView | null {
@@ -107,7 +102,7 @@ export function usePlanningView(itemId: ItemId, depotId: DepotId, pastDays = 21,
       onHand: loc.onHand,
       points,
       params,
-      d2CheckDay: params ? d2CheckDay(params.d2) : undefined,
+      d2CheckDay: params ? selectD2CheckDay(params) : undefined,
       proposal,
     };
   }, [game, itemId, depotId, pastDays, futureDays]);

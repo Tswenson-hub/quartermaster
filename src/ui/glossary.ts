@@ -10,6 +10,7 @@ export type TermKey =
   | 'safetyStock'
   | 'presentationStock'
   | 'projected'
+  | 'shortfall'
   | 'forecast'
   | 'leadTime'
   | 'orderDay'
@@ -75,6 +76,12 @@ export const GLOSSARY: Record<TermKey, GlossaryEntry> = {
     term: 'Projected stock',
     flavour: 'What the storehouse will hold, if all goes as foretold.',
     plain: 'Stock on hand, plus deliveries already ordered, minus forecast demand — day by day into the future.',
+  },
+  shortfall: {
+    term: 'Shortfall (unmet demand)',
+    flavour: 'Soldiers at the cart with empty bowls.',
+    plain:
+      'Projected stock can never fall below zero: you cannot hand out sacks you do not have. Demand beyond that goes unmet and is lost. The planner still counts it, as a negative number at D2, because the order must cover it too.',
   },
   forecast: {
     term: 'Forecast',
