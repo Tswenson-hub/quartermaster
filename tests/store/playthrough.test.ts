@@ -20,12 +20,19 @@ describe('playthrough: accept every proposal', () => {
     });
   }
 
-  // Accepting every system proposal should never starve the front. Exception: an order-trigger lesson
-  // (teaches 'order trigger') deliberately sets triggers the player must lower, so there the player
-  // first lowers every vendor's trigger to the rules default.
-  for (const scenario of scenarios) {
-    const triggerLesson = scenario.teaches.includes('order trigger');
-    it(`${scenario.id} keeps service level ≥ 95% when all proposals are accepted${triggerLesson ? ' (triggers lowered)' : ''}`, () => {
+  // Accepting every system proposal should never starve the front. Exceptions are lessons whose point is
+  // a player action, simulated here before accept-all:
+  // - 'order trigger': deliberately high triggers, so the player lowers every vendor's to the rules default;
+  // - 'forecast override': an understated or unannounced surge, so the player overrides it correctly
+  //   (simulated by revealing the true uplift: statedUplift = actualUplift).
+  for (const base of scenarios) {
+    const triggerLesson = base.teaches.includes('order trigger');
+    const overrideLesson = base.teaches.includes('forecast override');
+    const scenario: typeof base = overrideLesson
+      ? { ...base, initial: { ...base.initial, battlePlans: base.initial.battlePlans.map((b) => ({ ...b, statedUplift: b.actualUplift })) } }
+      : base;
+    const note = triggerLesson ? ' (triggers lowered)' : overrideLesson ? ' (surge overridden)' : '';
+    it(`${scenario.id} keeps service level ≥ 95% when all proposals are accepted${note}`, () => {
       const s = useGameStore.getState();
       s.loadScenario(scenario);
       if (triggerLesson) {
