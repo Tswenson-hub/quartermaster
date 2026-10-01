@@ -15,16 +15,12 @@ import {
   selectServiceLevel,
   useGameStore,
 } from '../store';
-import { sandboxScenario } from './mock/sandboxScenario';
+import { scenarios } from '../content';
 import { useUiStore } from './uiStore';
 
-// src/content may not export scenarios yet (content branch). Glob keeps the build green either way.
-const contentModules = import.meta.glob<{ scenarios?: Scenario[] }>('../content/index.ts', { eager: true });
-const contentScenarios = Object.values(contentModules)[0]?.scenarios ?? [];
-
-/** Playable levels; the UI sandbox is appended only while content has none. */
+/** Playable levels, tutorial first. */
 export function useScenarioList(): Scenario[] {
-  return contentScenarios.length ? contentScenarios : [sandboxScenario];
+  return scenarios;
 }
 
 export function useGame(): GameState | null {
