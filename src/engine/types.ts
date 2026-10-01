@@ -138,6 +138,8 @@ export interface BattlePlan {
   depotIds: DepotId[];
   /** Uplift factor stated in the letter, per item. */
   statedUplift: Record<ItemId, number>;
+  /** Service level to its depots over the window needed to win this battle; default rules.rank.battleWinServiceLevel. */
+  winServiceLevel?: number;
   /** Uplift that actually happens (hidden). Fog of war. */
   actualUplift: Record<ItemId, number>;
 }
@@ -303,10 +305,27 @@ export interface Letter {
   id: string;
   day: Day;
   kind: LetterKind;
+  /** Plain fallback text written by the engine. The UI shows selectLetterText(), which uses content templates. */
   from: string;
   subject: string;
   body: string;
   battlePlanId?: BattlePlanId;
+  /** Numbers behind the letter, so the store can render content's LETTER_TEMPLATES (engine never imports content). */
+  facts?: LetterFacts;
+}
+
+export interface LetterFacts {
+  /** Rank level after the event. */
+  rankLevel: number;
+  /** 0-based fiscal period index the letter is about. */
+  periodIndex?: number;
+  committed?: number;
+  allowance?: number;
+  /** Reprimands held after the event. */
+  reprimands?: number;
+  merit?: number;
+  /** Service level 0–1 (period or battle window). */
+  serviceLevel?: number;
 }
 
 /** Result of a battle plan's window, decided by service level to its depots during the window. */
