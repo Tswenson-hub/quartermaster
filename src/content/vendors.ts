@@ -77,16 +77,16 @@ const list: Vendor[] = [
     dcDepotId: 'kingsreach-dc',
     orderDays: [0, 1, 2, 3, 4, 5],
     leadTimeDays: 1,
-    reliability: 0.98,
+    reliability: 0.99,
   },
   {
-    // Escorted convoys to the siege lines, three times a week, two days on the road.
+    // Escorted convoys to the siege lines every day but the Sabbath, two days on the road.
     id: 'lane-kingsreach-harrowmere',
     name: 'Kingsreach → Harrowmere convoy',
     dcDepotId: 'kingsreach-dc',
-    orderDays: [0, 2, 4],
+    orderDays: [0, 1, 2, 3, 4, 5],
     leadTimeDays: 2,
-    reliability: 0.95,
+    reliability: 0.99,
   },
 ];
 

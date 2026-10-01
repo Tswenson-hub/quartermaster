@@ -37,7 +37,8 @@ produces the same numbers.
   The DC and any front depot without a lane buy from the outside vendors. Lane rules use the
   cheapest vendor cost (valuation only; transfers don't touch the budget) and the smallest vendor
   pack. DC locations have no history (their demand is dependent), service level 0.95, minimum
-  fill = 3 days and opening stock = 7–8 days of the served depots' combined demand.
+  fill = 3 days (tutorial-10) or 5 days (sandbox), and opening stock = 7–8 days of the served
+  depots' combined demand. Lane-fed front depots get a minimum fill of 2 days of their own demand.
 - **Split shares** are re-normalised per scenario over the vendors present. If only one source
   remains, `splitShare` is dropped.
 - **Opening stock** is `mean × onHandDays`, capped at half the shelf life for perishables.
@@ -47,24 +48,26 @@ produces the same numbers.
   is applied on top (easy 1.15, normal 1, hard 0.85). A final period cut short by the scenario end
   gets a pro-rated allowance.
 
-## Balance (market-driven demand, synthetic KO/AAPL/TSLA snapshots)
+## Balance (warm start + DC, market-driven demand, synthetic KO/AAPL/TSLA snapshots)
 
-> Measured before warm start, DC transfers and the 3-day minimum lead time. To be re-run once the
-> engine's DC support lands.
-
-Checked against the real engine with two strategies. **Accept-all** accepts every proposal.
-**Careful** also judges each letter correctly (stated uplift = actual uplift). Levels that teach
-`order trigger` are also checked with every trigger lowered to 0.5, and `forecast override` levels
-with statedUplift = actualUplift, as the lead's tests do. Battle thresholds come from
-`BattlePlan.winServiceLevel`.
+Checked against the real engine (warm start and DC transfers) over the **player's tenure**, i.e.
+from takeover on. Budget use includes the predecessor's spend in the period you take over. There
+are two strategies. **Accept-all** accepts every proposal. **Careful** also judges each letter
+correctly (stated uplift = actual uplift). Trigger lessons are also run with every trigger lowered
+to 0.5, and override lessons with the stated uplift equal to the actual one, as the lead's tests do.
 
 | Level | Accept-all, easy / normal / hard | Notes |
 |---|---|---|
-| I–V, VII | service 97–100%, budget used 46–100% | No letters beyond commendations. |
-| VI (trigger) | service ~42% at the default 0.8 trigger (no proposal ever fires); 100% with trigger 0.5 | Lesson: lower the smith's trigger. |
-| VIII (override) | service 94.2 / 95.7 / 96.4%; **levies battle lost** (92–95% against a 0.95 bar), demoted to rank 1 | The surge (grain ×2) never appears in the forecast. Careful (overrides correctly): 99% service, battle won, rank 3 on easy and normal; on hard, won but rank 2 (104% of budget). The tests apply the correct override to `forecast override` lessons. |
-| IX (letters, budget) | easy and normal: battles won, rank 2 → 4, no reprimands. Hard: 2 reprimands (136% / 109% of budget) | The careful player stays on budget on normal; on hard they are still reprimanded but win both battles. |
-| Sandbox | easy and normal: rank 2 → 4, **winter crossing lost** (understated letter). Hard: 2 reprimands, crossing lost, rank 3 | Careful: rank 6 on normal, rank 5 on hard, all 4 battles won. |
+| I–V, VII, X | service 96–100%; worst period 55–100% of budget; no reprimands on any difficulty | Allowance factors raised (III 1.2, IV 1.35, V 1.6, VII 1.6, X 1.5) to absorb the predecessor's spend in the takeover period. |
+| VI (trigger) | ~42% at the default 0.8 trigger (never fires); 100% with 0.5 | `warmupDays: 0` (on branch content-t6, merged). |
+| VIII (override) | 91 / 94 / 98% service; **levies battle lost on all three** (88–97% against a 0.98 bar), demoted to rank 1 | Careful: 99.7–100%, battle won, rank 3. |
+| IX (letters, budget) | easy and normal: rank 2 → 4, no reprimands. Hard: 1 reprimand (118% in period 2), rank 4 | Same outcome for careful. Factor 1.35. |
+| X (DC) | 99.5–99.7%; 56–99% of budget | Lanes run daily (Mon–Sat) at 0.99 reliability; lane-fed front depots keep a minimum fill of 2 days. |
+| Sandbox | rank 4 / 4 / 3: **winter crossing lost** (89–91% against a 0.93 bar); hard also gets a reprimand | Careful: rank 6 / 6 / 5, all four battles won. |
+
+DC tuning notes: with a Mon/Wed/Fri Harrowmere convoy at 0.95 reliability, one late convoy during
+the assault cost the battle even for the careful player. A daily lane at 0.99, a 2-day front minimum
+fill and a 5-day DC minimum fill (sandbox) fixed it.
 
 ## Items
 
@@ -94,8 +97,8 @@ with statedUplift = actualUplift, as the lead's tests do. Battle thresholds come
 | mountain-smithy | Ironhollow Mountain Smithy | Wed | 7 | 250 silver, trigger **0.8** | 0.80 |
 | river-merchants | Merchants of the Silverwash | Mon, Wed, Fri | 3 | — | 0.75 |
 | apothecary | Brother Fennick's Apothecary | Mon–Sat | 3 | — | 0.97 |
-| lane-kingsreach-east | Kingsreach → Eastern Camp wagons *(DC transfer lane)* | Mon–Sat | 1 | — | 0.98 |
-| lane-kingsreach-harrowmere | Kingsreach → Harrowmere convoy *(DC transfer lane)* | Mon, Wed, Fri | 2 | — | 0.95 |
+| lane-kingsreach-east | Kingsreach → Eastern Camp wagons *(DC transfer lane)* | Mon–Sat | 1 | — | 0.99 |
+| lane-kingsreach-harrowmere | Kingsreach → Harrowmere convoy *(DC transfer lane)* | Mon–Sat | 2 | — | 0.99 |
 
 Every outside vendor takes at least `rules.minVendorLeadTimeDays` (3); a content test enforces it.
 The transfer lanes are internal: `dcDepotId` = `kingsreach-dc`; `DC_LANES` maps each lane to the
@@ -123,7 +126,7 @@ front depot it serves.
 | levies-arrive | eastern-camp | d3 → d14–34 | *(no figures)* | grain 2.0, ale 2.1, bandages 1.5 | **silent**: needs a forecast override |
 
 Each plan ends in a battle. `BattlePlan.winServiceLevel` is the service level its depots need
-over the window to win: the assault needs 0.92, the feast 0.85, the levies 0.95, and the others 0.9. `BATTLES` in
+over the window to win: the assault needs 0.92, the feast 0.85, the winter crossing 0.93, the levies 0.98, and the ford feint 0.9. `BATTLES` in
 `battlePlans.ts` holds the flavour: name, key items, and victory and defeat lines (rendered by the
 store's `selectLetterText`).
 
