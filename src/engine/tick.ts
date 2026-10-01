@@ -3,6 +3,7 @@ import { nextOrderDayFrom } from './calendar';
 import { baselineFromHistory, forecastLocation } from './forecast';
 import { projectLocation } from './projection';
 import { generatePlanLines, roundToPack } from './replenishment';
+import { actualDemand } from './demand';
 import { addLot, consume, expire, lotsOf } from './lots';
 import { createRng, hashSeed, rngForDay } from './rng';
 import { rules as defaultRules, type Rules } from './rules.config';
@@ -46,17 +47,23 @@ function buildPeriods(scenario: Scenario): FiscalPeriod[] {
 
 export function initGame(scenario: Scenario, setup?: GameSetup, r: Rules = defaultRules): GameState {
   const { openOrders, rankLevel, ...initial } = scenario.initial;
-  // TODO(engine): placeholder defaults added by lead with the M2 contract. Engine owns: allowance ×
-  // rules.difficulty[d].budgetFactor, market-driven demand, vendorPlans, rank/letters/battles, status.
+  const difficulty = setup?.difficulty ?? 'normal';
+  // §11 difficulty: budget tightness scales every period's allowance.
+  const budgetFactor = r.difficulty[difficulty].budgetFactor;
+  const periods = (initial.periods.length > 0 ? initial.periods : buildPeriods(scenario)).map((p) => ({
+    ...p,
+    allowance: p.allowance * budgetFactor,
+  }));
   const state: GameState = {
     ...initial,
     today: 0,
-    periods: initial.periods.length > 0 ? initial.periods : buildPeriods(scenario),
+    periods,
     openOrders: openOrders ?? [],
     proposals: [],
     exceptions: [],
     kpis: [],
-    difficulty: setup?.difficulty ?? 'normal',
+    difficulty,
+    // Without a setup (tests): a flat market, factor 1 every day.
     market: setup?.market ?? {
       ticker: 'FLAT',
       source: 'snapshot',
@@ -180,7 +187,7 @@ export function placeOrders(state: GameState, decisions: ProposalDecisionInput[]
 
 /**
  * Advance one day. For day t = today, per item-location in order: receive deliveries due,
- * draw actual demand (history rate × actual battle-plan uplift × seeded noise), fulfil
+ * draw actual demand (demand.ts: base rate × market × actual uplift × noise), fulfil
  * (unmet demand is lost), spoil, accrue holding cost. Then morale, period-end budget
  * penalties and the day's KPI row. Returns state for t + 1 with fresh proposals/exceptions.
  */
@@ -225,12 +232,7 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
     let stock = loc.onHand + received;
 
     const forecastToday = forecastLocation(state, loc, t, t, r)[0].total;
-    const rate = loc.history.length === 0 ? 0 : mean(loc.history.slice(-r.demand.baseWindow));
-    const uplift = state.battlePlans
-      .filter((p) => p.start <= t && t <= p.end && p.depotIds.includes(loc.depotId))
-      .reduce((f, p) => f * (p.actualUplift[loc.itemId] ?? 1), 1);
-    const noise = rng.normal(); // always drawn, so the sequence doesn't depend on parameters
-    const demand = Math.max(0, Math.round(rate * uplift * (1 + r.demand.noiseCv * noise)));
+    const demand = actualDemand(state, loc, t, rng, r);
 
     const useLots = item?.shelfLifeDays !== undefined && item.shelfLifeDays > 0 && r.spoilage.mode === 'lots';
     let lots = useLots || loc.lots ? addLot(lotsOf(loc, t), received, t) : undefined;
@@ -335,9 +337,6 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
   return closeNotices.length ? { ...refreshed, exceptions: [...refreshed.exceptions, ...closeNotices] } : refreshed;
 }
 
-function mean(xs: readonly number[]): number {
-  return xs.length === 0 ? 0 : xs.reduce((a, b) => a + b, 0) / xs.length;
-}
 function clamp(x: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, x));
 }
