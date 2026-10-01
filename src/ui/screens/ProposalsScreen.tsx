@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isTransferLane } from '../dc';
 import type { GameState, ProposalReason, Vendor, VendorPlan } from '../../engine/types';
 import { ItemIcon, VendorTile } from '../components/ItemIcon';
 import { Meter } from '../components/Meter';
@@ -61,6 +62,8 @@ export function ProposalsScreen() {
 
 function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
   const { vendor, lines } = group;
+  const lane = isTransferLane(vendor);
+  const dc = lane ? game.depots[vendor.dcDepotId!] : undefined;
   const { decideProposal } = useGameActions();
   const min = vendor.minimum;
   const accepted = min ? (min.kind === 'value' ? group.acceptedValue : group.acceptedUnits) : 0;
@@ -70,11 +73,22 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
 
   return (
     <Panel
-      className="vendor-card"
+      className={`vendor-card ${lane ? 'lane-card' : ''}`}
       title={
         <span className="vendor-heading">
           <VendorTile id={vendor.id} name={vendor.name} />
-          {vendor.name}
+          {lane ? (
+            <>
+              <Term k="transfer">Transfer</Term> from {dc?.name ?? vendor.dcDepotId}
+            </>
+          ) : (
+            vendor.name
+          )}
+          {lane && (
+            <span className="tag tag-lane">
+              <Term k="dc">DC</Term> lane
+            </span>
+          )}
         </span>
       }
       flavour={
@@ -158,7 +172,7 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
           </thead>
           <tbody>
             {lines.map((l) => (
-              <ProposalRow key={l.index} line={l} game={game} />
+              <ProposalRow key={l.index} line={l} game={game} transfer={lane} />
             ))}
           </tbody>
         </table>
@@ -168,7 +182,7 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
   );
 }
 
-function ProposalRow({ line, game }: { line: ProposalLine; game: GameState }) {
+function ProposalRow({ line, game, transfer }: { line: ProposalLine; game: GameState; transfer: boolean }) {
   const { proposal: p, decision, qty, packSize } = line;
   const { decideProposal } = useGameActions();
   const setDraftQty = useUiStore((s) => s.setDraftQty);
@@ -230,7 +244,9 @@ function ProposalRow({ line, game }: { line: ProposalLine; game: GameState }) {
         </div>
         <div className="muted small">×{packSize}{line.edited && <> · was {fmtQty(p.qty)}</>}</div>
       </td>
-      <td data-label="Cost" className="num">{fmtSilver(line.cost)}</td>
+      <td data-label="Cost" className="num">
+        {transfer ? <span className="muted" title="Ships from DC stock; no cost against the budget">transfer</span> : fmtSilver(line.cost)}
+      </td>
       <td data-label="Decision">
         <div className="decision-btns">
           <button

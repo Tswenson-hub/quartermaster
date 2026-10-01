@@ -28,6 +28,7 @@ import type {
 } from '../engine/types';
 import {
   isScenarioOver,
+  selectCampaignDay,
   selectCurrentPeriod,
   selectD2CheckDay,
   selectDecisionPreview,
@@ -332,10 +333,27 @@ export function useExceptionsToday(): PlanningException[] {
   return useMemo(() => (game ? selectExceptionsToday(game) : []), [game]);
 }
 
-/** Service level to date as a percentage (0–100). */
+/** Days played since the player took command (0 on the takeover morning). */
+export function commandDays(game: GameState): number {
+  return Math.max(0, game.today - game.startDay);
+}
+
+/** Service level since the player took command, as a percentage (0–100); 100 before any day is played. */
 export function useServiceLevel(): number {
   const game = useGame();
-  return useMemo(() => (game ? Math.round(selectServiceLevel(game) * 1000) / 10 : 100), [game]);
+  return useMemo(() => {
+    if (!game) return 100;
+    const days = commandDays(game);
+    // The inherited warm-up record is not the player's doing.
+    const sl = days === 0 ? 1 : game.startDay === 0 ? selectServiceLevel(game) : selectKpiSummary(game, days).serviceLevel;
+    return Math.round(sl * 1000) / 10;
+  }, [game]);
+}
+
+/** "Day N of M" since taking command, and how many days the previous quartermaster ran. */
+export function useCampaignDay() {
+  const game = useGame();
+  return useMemo(() => (game ? selectCampaignDay(game) : null), [game]);
 }
 
 export function useKpiSummary(lastDays?: number) {

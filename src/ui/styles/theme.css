@@ -1424,6 +1424,116 @@ input.edited {
   padding-top: 18px;
 }
 
+/* ------------------------------------------------------------------ MOP trio */
+/* Safety stock, minimum fill and MOP read as one group: same tint everywhere they appear. */
+:root {
+  --mop-tint: rgba(168, 32, 42, 0.07);
+  --mop-edge: rgba(168, 32, 42, 0.55);
+}
+.mop-trio {
+  position: relative;
+  z-index: 1;
+  background: var(--mop-tint);
+  border-left: 4px solid var(--mop-edge);
+  padding: 6px 10px 4px;
+  margin-bottom: 10px;
+}
+.mop-trio-caption {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+}
+.mop-trio-facts dt.mop-driver,
+.mop-trio-facts dd.mop-driver {
+  font-weight: 700;
+}
+.mop-trio-facts .mop-total {
+  border-top: 2px solid var(--mop-edge);
+  border-bottom: 0;
+  padding-top: 2px;
+  font-weight: 700;
+}
+.sets-mop {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--blood);
+  vertical-align: 1px;
+}
+.mop-driver {
+  font-weight: 700;
+}
+.sets-mop-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 4px;
+  background: var(--blood);
+  vertical-align: 2px;
+}
+.mop-group-head {
+  white-space: nowrap !important;
+  text-align: center !important;
+  background: var(--mop-tint);
+  border-bottom: 2px solid var(--mop-edge) !important;
+  font-size: 12px;
+}
+.master-table th.mop-col,
+.master-table td.mop-col {
+  background: var(--mop-tint);
+}
+.master-legend {
+  margin-left: 14px;
+  font-weight: 400;
+  font-size: 13px;
+}
+.term-tip-related {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------ DC & transfer lanes */
+.tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  vertical-align: 2px;
+  white-space: nowrap;
+}
+.tag .term {
+  border-bottom-color: currentColor;
+}
+.tag-dc {
+  background: #4f5d73;
+  color: #fff;
+}
+.tag-lane {
+  background: transparent;
+  color: #4f5d73;
+  box-shadow: inset 0 0 0 2px #4f5d73;
+}
+.lane-card {
+  border-top: 6px solid #4f5d73;
+}
+.master-table tr.lane-row td {
+  background: rgba(79, 93, 115, 0.07);
+}
+.dc-note {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  background: rgba(79, 93, 115, 0.1);
+  border-left: 6px solid #4f5d73;
+}
+
 /* ------------------------------------------------------------------ master data */
 .master-count {
   position: relative;

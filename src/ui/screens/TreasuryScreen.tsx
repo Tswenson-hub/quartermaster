@@ -1,5 +1,6 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Meter } from '../components/Meter';
+import { isTransferLane } from '../dc';
 import { Panel } from '../components/Panel';
 import { Term } from '../components/Term';
 import { fmtDay, fmtQty, fmtSilver } from '../format';
@@ -73,7 +74,7 @@ export function TreasuryScreen() {
           )}
         </Panel>
 
-        <Panel title="Wagons on the road" flavour="Paid for, not yet arrived.">
+        <Panel title="Wagons on the road" flavour="Paid for, not yet arrived. Transfers from a DC cost nothing against the budget.">
           {transit.length ? (
             <div className="table-scroll">
               <table className="simple-table">
@@ -95,7 +96,7 @@ export function TreasuryScreen() {
                       </td>
                       <td className="num">{fmtQty(o.qty)}</td>
                       <td className="num">
-                        {fmtSilver(o.cost)}
+                        {isTransferLane(game.vendors[o.vendorId]) ? <span className="muted">transfer</span> : fmtSilver(o.cost)}
                       </td>
                     </tr>
                   ))}

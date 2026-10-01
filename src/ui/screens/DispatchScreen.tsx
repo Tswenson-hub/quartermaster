@@ -1,6 +1,7 @@
 import type { ExceptionKind, PlanningException } from '../../engine/types';
 import { ItemIcon } from '../components/ItemIcon';
 import { KpiPanel } from '../components/KpiPanel';
+import { TakeoverNote } from '../components/TakeoverNote';
 import { Panel } from '../components/Panel';
 import { Term } from '../components/Term';
 import { fmtDay, fmtQty } from '../format';
@@ -17,7 +18,7 @@ const KIND: Record<ExceptionKind, { label: string; severity: 'critical' | 'serio
   'over-budget': { label: 'Over budget', severity: 'critical' },
   spoilage: { label: 'Spoilage', severity: 'warning' },
   stockout: { label: 'Stockout', severity: 'critical' },
-  'dc-short': { label: 'Depot short-shipped', severity: 'serious' },
+  'dc-short': { label: 'DC short-shipped', severity: 'serious' },
 };
 const SEVERITY_ICON = { critical: '!!', serious: '!', warning: '?', info: 'i' };
 const SEVERITY_RANK = { critical: 0, serious: 1, warning: 2, info: 3 };
@@ -74,6 +75,7 @@ export function DispatchScreen() {
 
   return (
     <div className="stack">
+    <TakeoverNote />
     <KpiPanel />
     <div className="screen-grid dispatch-grid">
       <Panel

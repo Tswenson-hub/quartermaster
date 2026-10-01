@@ -1,5 +1,7 @@
 import type { GameState, ItemLocation } from '../../engine/types';
 import { ForecastGrid, OverridePanel } from '../components/ForecastEditor';
+import { MopTrio } from '../components/MopTrio';
+import { isDc } from '../dc';
 import { ItemIcon } from '../components/ItemIcon';
 import { Panel } from '../components/Panel';
 import { PlanningCharts } from '../components/PlanningCharts';
@@ -26,7 +28,14 @@ export function PlanningScreen() {
             if (!locs.length) return null;
             return (
               <div key={depot.id} className="ledger-depot">
-                <h3 className="ledger-depot-name">{depot.name}</h3>
+                <h3 className="ledger-depot-name">
+                  {depot.name}
+                  {isDc(depot) && (
+                    <span className="tag tag-dc">
+                      <Term k="dc">DC</Term>
+                    </span>
+                  )}
+                </h3>
                 <ul className="ledger-list">
                   {locs.map((l) => {
                     const item = game.items[l.itemId];
@@ -60,6 +69,7 @@ export function PlanningScreen() {
 function ItemDetail({ game, loc }: { game: GameState; loc: ItemLocation }) {
   const view = usePlanningView(loc.itemId, loc.depotId);
   const item = game.items[loc.itemId];
+  const dcLoc = isDc(game.depots[loc.depotId]);
   if (!view || !item) return null;
   const { params, proposal } = view;
   const vendor = params ? game.vendors[params.vendorId] : undefined;
@@ -74,11 +84,24 @@ function ItemDetail({ game, loc }: { game: GameState; loc: ItemLocation }) {
             <span>
               {item.name}
               <span className="muted"> at {game.depots[loc.depotId]?.name}</span>
+              {dcLoc && (
+                <span className="tag tag-dc">
+                  <Term k="dc">DC</Term>
+                </span>
+              )}
             </span>
           </span>
         }
         flavour={`${fmtQty(loc.onHand)} ${item.unit}s in the storehouse this morning.`}
       >
+        {dcLoc && (
+          <p className="dc-note" data-testid="dc-note">
+            This is a <Term k="dc">distribution centre</Term>: no soldiers eat here. Its forecast is the{' '}
+            <Term k="dependentDemand">front depots’ planned transfer orders</Term>, not consumption, so the demand chart below
+            shows transfers shipped against transfers planned. Keep it above its MOP and the depots’ transfers ship in full;
+            let it run short and they are short-shipped.
+          </p>
+        )}
         {params && (
           <p className={`verdict ${belowMop ? 'verdict-bad' : 'verdict-ok'}`}>
             {belowMop ? '⚠ ' : '✓ '}
@@ -94,23 +117,19 @@ function ItemDetail({ game, loc }: { game: GameState; loc: ItemLocation }) {
             {!belowMop ? 'No order needed to stay safe.' : params.projectedAtD2 < 0 ? 'You must order today.' : 'You must order today or the men go without.'}
           </p>
         )}
-        <PlanningCharts view={view} unit={item.unit} battlePlans={game.battlePlans.filter((b) => b.announcedOn <= game.today && b.depotIds.includes(loc.depotId))} />
+        <PlanningCharts view={view} unit={item.unit} dc={dcLoc} battlePlans={game.battlePlans.filter((b) => b.announcedOn <= game.today && b.depotIds.includes(loc.depotId))} />
         <p className="chart-note muted">
-          Shaded days are battle-plan windows. The dot is the stock just before the D2 delivery: the level this order must
-          keep above the MOP. A red bar below zero is demand that would go unmet.
+          Shaded days are battle-plan windows. The red-tinted band is the zone below the MOP, which is the larger of safety
+          stock (SS) and minimum fill. The dot is the stock just before the D2 delivery: the level this order must keep above
+          the MOP. A red bar below zero is demand that would go unmet.
         </p>
       </Panel>
 
       <div className="two-col">
         <Panel title="Replenishment figures" flavour="As reckoned by the clerk.">
+          {params && <MopTrio safetyStock={params.safetyStock} minimumFill={params.minimumFill} mop={params.mustOrderPoint} />}
           {params ? (
             <dl className="facts">
-              <dt><Term k="safetyStock" /></dt>
-              <dd>{fmtQty(params.safetyStock)}</dd>
-              <dt><Term k="minimumFill" /></dt>
-              <dd>{fmtQty(params.minimumFill)}</dd>
-              <dt><Term k="mop">MOP</Term> <span className="muted">larger of the two</span></dt>
-              <dd data-testid="planning-mop">{fmtQty(params.mustOrderPoint)}</dd>
               <dt><Term k="cop">COP</Term> <span className="muted">can order point</span></dt>
               <dd>{fmtQty(params.canOrderPoint)}</dd>
               <dt>Supplier</dt>

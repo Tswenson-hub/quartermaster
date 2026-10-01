@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import type { TermKey } from '../glossary';
-import { useKpiSummary } from '../hooks';
+import { commandDays, useGame, useKpiSummary } from '../hooks';
 import { Panel } from './Panel';
 import { Term } from './Term';
 
@@ -22,12 +22,25 @@ function Tile({ k, label, value, hint, testId }: { k: TermKey; label: string; va
 }
 
 /** Campaign KPIs (RELEX_RULES §10), computed by the engine via selectKpiSummary. */
+type KpiWindow = 'command' | 'week' | 'all';
+
 export function KpiPanel() {
-  const [window, setWindow] = useState<number | undefined>(undefined);
-  const k = useKpiSummary(window);
+  const game = useGame();
+  const [win, setWin] = useState<KpiWindow>('command');
+  const days = game ? commandDays(game) : 0;
+  const inherited = !!game && game.startDay > 0;
+  // selectKpiSummary(game, n) uses the last n KPI rows; with no days in command yet, nothing is the player's.
+  const lastDays = win === 'all' ? undefined : win === 'week' ? 7 : inherited ? Math.max(days, 0) : undefined;
+  const k = useKpiSummary(lastDays === 0 ? undefined : lastDays);
   if (!k) return null;
+  const empty = win === 'command' && inherited && days === 0;
   const dos = Math.round(k.daysOfSupply * 10) / 10;
   const dosText = !Number.isFinite(dos) || dos > 999 ? '999+ d' : `${dos} d`;
+  const windows: [KpiWindow, string][] = [
+    ['command', inherited ? 'Your command' : 'Campaign'],
+    ['week', 'Last 7 days'],
+    ...(inherited ? ([['all', 'Inherited record']] as [KpiWindow, string][]) : []),
+  ];
 
   return (
     <Panel
@@ -36,15 +49,17 @@ export function KpiPanel() {
       flavour="How well the army is kept, as the Lord Marshal reckons it."
       actions={
         <div className="seg-toggle" role="group" aria-label="KPI window">
-          <button type="button" className={`btn btn-small ${window === undefined ? 'on' : ''}`} aria-pressed={window === undefined} onClick={() => setWindow(undefined)}>
-            Campaign
-          </button>
-          <button type="button" className={`btn btn-small ${window === 7 ? 'on' : ''}`} aria-pressed={window === 7} onClick={() => setWindow(7)}>
-            Last 7 days
-          </button>
+          {windows.map(([id, label]) => (
+            <button key={id} type="button" className={`btn btn-small ${win === id ? 'on' : ''}`} aria-pressed={win === id} onClick={() => setWin(id)}>
+              {label}
+            </button>
+          ))}
         </div>
       }
     >
+      {empty ? (
+        <p className="empty">No days under your command yet. End your first day, or look at the inherited record.</p>
+      ) : (
       <div className="kpi-grid">
         <Tile
           k="serviceLevel"
@@ -62,6 +77,7 @@ export function KpiPanel() {
           hint={Math.abs(k.bias) <= 0.05 ? 'Leans neither way.' : k.bias > 0 ? 'Forecasting too much.' : 'Forecasting too little.'}
         />
       </div>
+      )}
     </Panel>
   );
 }

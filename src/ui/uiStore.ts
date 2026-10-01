@@ -22,6 +22,8 @@ interface UiState {
   reviewingEnd: boolean;
   /** Which roll the Master Data screen shows. */
   masterTab: MasterTab;
+  /** The player has read the one-time "You take command" note. */
+  seenTakeover: boolean;
   go: (screen: Screen) => void;
   planItem: (itemId: ItemId, depotId: DepotId) => void;
   openLetter: (id: BattlePlanId) => void;
@@ -31,6 +33,7 @@ interface UiState {
   clearDrafts: () => void;
   reviewEnd: () => void;
   setMasterTab: (tab: MasterTab) => void;
+  dismissTakeover: () => void;
   /** Forget everything tied to the current campaign. */
   resetCampaign: () => void;
 }
@@ -44,6 +47,7 @@ const campaignDefaults = {
   draftQty: {},
   reviewingEnd: false,
   masterTab: 'items' as MasterTab,
+  seenTakeover: false,
 };
 
 export const useUiStore = create<UiState>()(
@@ -65,13 +69,19 @@ export const useUiStore = create<UiState>()(
       clearDrafts: () => set({ draftQty: {} }),
       reviewEnd: () => set({ reviewingEnd: true }),
       setMasterTab: (masterTab) => set({ masterTab }),
+      dismissTakeover: () => set({ seenTakeover: true }),
       resetCampaign: () => set(campaignDefaults),
     }),
     {
       // Read/seen markers survive a reload alongside the game save; drafts and navigation do not.
       name: 'quartermaster-ui',
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ openedLetters: s.openedLetters, readLetters: s.readLetters, seenBattles: s.seenBattles }),
+      partialize: (s) => ({
+        openedLetters: s.openedLetters,
+        readLetters: s.readLetters,
+        seenBattles: s.seenBattles,
+        seenTakeover: s.seenTakeover,
+      }),
     },
   ),
 );

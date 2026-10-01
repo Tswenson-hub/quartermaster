@@ -89,6 +89,8 @@ interface ScenarioSpec {
   morale?: number;
   /** Starting rank level (0–6); default rules.rank.startLevel. */
   rankLevel?: number;
+  /** Warm-up days before takeover (multiple of 7); default rules.warmup.days. */
+  warmupDays?: number;
 }
 
 function pick<T>(record: Record<string, T>, ids: string[]): Record<string, T> {
@@ -181,6 +183,7 @@ function buildScenario(s: ScenarioSpec): Scenario {
     briefing: s.briefing,
     teaches: s.teaches,
     lengthDays: s.lengthDays,
+    ...(s.warmupDays !== undefined ? { warmupDays: s.warmupDays } : {}),
     periodLengthDays: s.periodLengthDays,
     periodAllowance,
     initial: {
@@ -209,12 +212,15 @@ const tutorial: ScenarioSpec[] = [
     title: 'I. Linen for the Surgeons',
     briefing:
       'You are newly sworn as Quartermaster of the Eastern Camp. Your first charge is humble: ' +
-      "keep the surgeons' tent in linen bandages. Brother Fennick's apothecary delivers the day " +
-      'after you order. Each morning the clerks draw up an ORDER PROPOSAL from the forecast. ' +
+      "keep the surgeons' tent in linen bandages. Brother Fennick's apothecary takes orders every " +
+      'day but Sunday and delivers three days later. Your predecessor has kept the books for a week; ' +
+      'from this Monday they are yours. Each morning the clerks draw up an ORDER PROPOSAL from the forecast. ' +
       'Accept it, change it, or reject it, then watch the PROJECTED STOCK line. Never let it touch zero.',
     teaches: ['forecast', 'projected stock', 'order proposal'],
     seed: 1101,
     lengthDays: 14,
+    // A short hand-over: the previous quartermaster ran the camp for one week.
+    warmupDays: 7,
     periodLengthDays: 28,
     allowanceFactor: 1.5,
     vendorIds: ['apothecary'],
@@ -310,6 +316,9 @@ const tutorial: ScenarioSpec[] = [
     teaches: ['order trigger', 'below-trigger (no proposal)', 'adjusting the trigger', 'lead time risk'],
     seed: 1606,
     lengthDays: 28,
+    // No warm-up: a predecessor on the default 0.8 trigger would never order, so the garrison would
+    // be out of shoes by takeover. The player arrives with stock in hand and time to act.
+    warmupDays: 0,
     periodLengthDays: 28,
     allowanceFactor: 1.3,
     vendorIds: ['mountain-smithy'],

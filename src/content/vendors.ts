@@ -42,19 +42,19 @@ const list: Vendor[] = [
     reliability: 0.8,
   },
   {
-    // Fast barges three days a week — when the river isn't in flood and the tolls are paid.
+    // Barges three days a week, three days downriver — when the river isn't in flood and the tolls are paid.
     id: 'river-merchants',
     name: 'Merchants of the Silverwash',
     orderDays: [0, 2, 4],
-    leadTimeDays: 2,
+    leadTimeDays: 3,
     reliability: 0.75,
   },
   {
-    // Brother Fennick's boy rides out every day but the Sabbath.
+    // Brother Fennick's boy rides out every day but the Sabbath; the road to camp takes three days.
     id: 'apothecary',
     name: "Brother Fennick's Apothecary",
     orderDays: [0, 1, 2, 3, 4, 5],
-    leadTimeDays: 1,
+    leadTimeDays: 3,
     reliability: 0.97,
   },
   {
