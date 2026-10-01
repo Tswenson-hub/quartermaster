@@ -52,3 +52,28 @@ describe('selectKpiSummary', () => {
     expect(selectKpiSummary(game, 1).serviceLevel).toBe(0.5);
   });
 });
+
+describe('selectLetterText', () => {
+  it('falls back to engine text without facts', async () => {
+    const { selectLetterText } = await import('../../src/store/selectors');
+    const game = engine.initGame(fixtureScenario);
+    const letter = { id: 'l1', day: 3, kind: 'reprimand' as const, from: 'HQ', subject: 'S', body: 'B' };
+    expect(selectLetterText(game, letter)).toEqual({ from: 'HQ', subject: 'S', body: 'B' });
+  });
+
+  it('renders content templates from facts, with the rank title', async () => {
+    const { selectLetterText } = await import('../../src/store/selectors');
+    const { rankTitle } = await import('../../src/content/ranks');
+    const game = engine.initGame(fixtureScenario);
+    const text = selectLetterText(game, {
+      id: 'l2',
+      day: 28,
+      kind: 'promotion',
+      from: 'HQ',
+      subject: 'S',
+      body: 'B',
+      facts: { rankLevel: 3, merit: 0 },
+    });
+    expect(text.subject + text.body).toContain(rankTitle(3));
+  });
+});
