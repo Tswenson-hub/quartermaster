@@ -40,7 +40,7 @@ describe('order-trigger lesson rule', () => {
 
   it('is detected from teaches', () => {
     expect(isTriggerLesson(lesson)).toBe(true);
-    expect(isTriggerLesson(base)).toBe(false);
+    expect(isTriggerLesson({ ...base, teaches: base.teaches.filter((t) => t !== 'order trigger') })).toBe(false);
   });
 
   it('high triggers starve the army; lowering them to the default restores ≥ 95%', () => {
