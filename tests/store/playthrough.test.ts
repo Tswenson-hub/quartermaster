@@ -3,7 +3,14 @@ import { scenarios } from '../../src/content';
 import { rules } from '../../src/engine/rules.config';
 
 vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
-const { useGameStore, selectServiceLevel } = await import('../../src/store');
+const { useGameStore } = await import('../../src/store');
+
+/** Service level over the player's tenure only (from takeover); the predecessor's warm-up doesn't count. */
+function playerServiceLevel(game: NonNullable<ReturnType<typeof useGameStore.getState>['game']>): number {
+  const ks = game.kpis.filter((k) => k.day >= game.startDay);
+  const demand = ks.reduce((a, k) => a + k.demand, 0);
+  return demand === 0 ? 1 : ks.reduce((a, k) => a + k.fulfilled, 0) / demand;
+}
 
 describe('playthrough: accept every proposal', () => {
   for (const scenario of scenarios) {
@@ -16,7 +23,7 @@ describe('playthrough: accept every proposal', () => {
       }
       const game = useGameStore.getState().game!;
       expect(game.today).toBe(scenario.lengthDays);
-      if (scenario.id === 'tutorial-1') expect(selectServiceLevel(game)).toBe(1);
+      if (scenario.id === 'tutorial-1') expect(playerServiceLevel(game)).toBe(1);
     });
   }
 
@@ -42,7 +49,7 @@ describe('playthrough: accept every proposal', () => {
         useGameStore.getState().game!.proposals.forEach((_, i) => s.decideProposal(i, 'accepted'));
         s.endDay();
       }
-      expect(selectServiceLevel(useGameStore.getState().game!)).toBeGreaterThanOrEqual(0.95);
+      expect(playerServiceLevel(useGameStore.getState().game!)).toBeGreaterThanOrEqual(0.95);
     });
   }
 });
