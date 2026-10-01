@@ -30,9 +30,9 @@ Several agents work in parallel, each in its own git worktree/branch. Only edit 
 - Commit small and often on your branch. Lead merges into `main`.
 
 ## Engine ↔ store ↔ UI
-- Engine exposes `EngineApi` (in `types.ts`) from `src/engine/index.ts`: `initGame`, `refresh`, `forecast`, `project`, `placeOrders`, `tick`.
+- Engine exposes `EngineApi` (in `types.ts`) from `src/engine/index.ts`: `initGame`, `refresh`, `forecast`, `planningParams`, `project`, `placeOrders`, `tick`.
 - `src/store/engine.ts` binds the store to an implementation (a stub in `engineStub.ts` until the engine branch merges).
-- UI imports only from `src/store` (`useGameStore`, `select*` selectors) plus types from `src/engine/types.ts`.
+- UI imports only from `src/store` (`useGameStore`, `select*` selectors incl. `selectPlanningParams`, `selectServiceLevel`) plus types from `src/engine/types.ts`.
 - Store actions: `loadScenario`, `decideProposal(index, decision, qty?)`, `setOverride`, `clearOverride`, `endDay`, `newGame`. Saves to localStorage key `quartermaster-save`.
 - Content exports `scenarios: Scenario[]` from `src/content/index.ts`; tutorial level 1 has id `tutorial-1`.
 - e2e `data-testid`s (UI provides): `start-scenario-<id>`, `proposal-row`, `proposal-accept`, `end-day`, `today`, `morale`, `kpi-service-level`.

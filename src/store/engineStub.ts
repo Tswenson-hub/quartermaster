@@ -17,6 +17,7 @@ import type {
   PlanningException,
   ProposalDecisionInput,
   Scenario,
+  SourcingRule,
   Vendor,
 } from '../engine/types';
 
@@ -102,45 +103,69 @@ const project: EngineApi['project'] = (state, itemId, depotId, from, to) => {
   return out;
 };
 
+const planningParams: EngineApi['planningParams'] = (state, itemId, depotId) => {
+  const loc = findLoc(state, itemId, depotId);
+  const t = state.today;
+  // Earliest order opportunity from today across sources; ties go to the preferred (lowest priority).
+  let best: { source: SourcingRule; orderDay: Day } | undefined;
+  for (const source of state.sourcing.filter((s) => s.itemId === itemId)) {
+    const vendor = state.vendors[source.vendorId];
+    if (!vendor || vendor.orderDays.length === 0) continue;
+    const orderDay = isOrderDay(vendor, t) ? t : nextOrderDay(vendor, t);
+    if (!best || orderDay < best.orderDay || (orderDay === best.orderDay && source.priority < best.source.priority)) {
+      best = { source, orderDay };
+    }
+  }
+  if (!best) return undefined;
+  const vendor = state.vendors[best.source.vendorId];
+  const next = nextOrderDay(vendor, best.orderDay);
+  const d1 = best.orderDay + vendor.leadTimeDays;
+  const d2 = next + vendor.leadTimeDays;
+  const avg = mean(recent(loc));
+  const safetyStock = rules.safetyStock({
+    serviceLevel: loc.serviceLevel,
+    forecastErrorStdDev: stdDev(recent(loc)),
+    leadTimeDays: vendor.leadTimeDays,
+    reviewPeriodDays: next - best.orderDay,
+    avgDailyForecast: avg,
+  });
+  const mustOrderPoint = safetyStock + loc.presentationStock;
+  return {
+    itemId,
+    depotId,
+    vendorId: vendor.id,
+    orderDay: best.orderDay,
+    d1,
+    d2,
+    safetyStock,
+    mustOrderPoint,
+    canOrderPoint: mustOrderPoint + rules.canOrderPoint.extraDaysOfCover * avg,
+    orderUpTo: mustOrderPoint + rules.orderUpToExtraDays * avg,
+    // Measured at end of D2 − 1, just before the next order's delivery (RELEX_RULES §2).
+    projectedAtD2: project(state, itemId, depotId, d2 - 1, d2 - 1)[0],
+  };
+};
+
 function proposalsFor(state: GameState): { proposals: OrderProposal[]; exceptions: PlanningException[] } {
   const proposals: OrderProposal[] = [];
   const exceptions: PlanningException[] = [];
   const t = state.today;
   for (const loc of state.locations) {
-    const source = state.sourcing
-      .filter((s) => s.itemId === loc.itemId && isOrderDay(state.vendors[s.vendorId], t))
-      .sort((a, b) => a.priority - b.priority)[0];
-    if (!source) continue;
-    const vendor = state.vendors[source.vendorId];
-    const d1 = t + vendor.leadTimeDays;
-    const next = nextOrderDay(vendor, t);
-    const d2 = next + vendor.leadTimeDays;
-    const avg = mean(recent(loc));
-    const mop =
-      rules.safetyStock({
-        serviceLevel: loc.serviceLevel,
-        forecastErrorStdDev: stdDev(recent(loc)),
-        leadTimeDays: vendor.leadTimeDays,
-        reviewPeriodDays: next - t,
-        avgDailyForecast: avg,
-      }) + loc.presentationStock;
-    const cop = mop + rules.canOrderPoint.extraDaysOfCover * avg;
-    // Measured at end of D2 − 1, just before the next order's delivery (RELEX_RULES §2).
-    const projectedAtD2 = project(state, loc.itemId, loc.depotId, d2 - 1, d2 - 1)[0];
-    if (projectedAtD2 >= mop) continue;
-    const target = mop + rules.orderUpToExtraDays * avg;
-    const qty = Math.ceil((target - projectedAtD2) / source.packSize) * source.packSize;
+    const pp = planningParams(state, loc.itemId, loc.depotId);
+    if (!pp || pp.orderDay !== t || pp.projectedAtD2 >= pp.mustOrderPoint) continue;
+    const source = state.sourcing.find((s) => s.itemId === loc.itemId && s.vendorId === pp.vendorId)!;
+    const qty = Math.ceil((pp.orderUpTo - pp.projectedAtD2) / source.packSize) * source.packSize;
     proposals.push({
       itemId: loc.itemId,
       depotId: loc.depotId,
-      vendorId: vendor.id,
+      vendorId: pp.vendorId,
       qty,
       reason: 'must',
-      d1,
-      d2,
-      projectedAtD2,
-      mustOrderPoint: mop,
-      canOrderPoint: cop,
+      d1: pp.d1,
+      d2: pp.d2,
+      projectedAtD2: pp.projectedAtD2,
+      mustOrderPoint: pp.mustOrderPoint,
+      canOrderPoint: pp.canOrderPoint,
       cost: qty * source.unitCost,
     });
     exceptions.push({
@@ -148,8 +173,8 @@ function proposalsFor(state: GameState): { proposals: OrderProposal[]; exception
       day: t,
       itemId: loc.itemId,
       depotId: loc.depotId,
-      vendorId: vendor.id,
-      message: `${state.items[loc.itemId]?.name ?? loc.itemId} falls below MOP by day ${d2 - 1}`,
+      vendorId: pp.vendorId,
+      message: `${state.items[loc.itemId]?.name ?? loc.itemId} falls below MOP by day ${pp.d2 - 1}`,
     });
   }
   return { proposals, exceptions };
@@ -243,4 +268,4 @@ const tick: EngineApi['tick'] = (state) => {
   });
 };
 
-export const stubEngine: EngineApi = { initGame, refresh, forecast, project, placeOrders, tick };
+export const stubEngine: EngineApi = { initGame, refresh, forecast, planningParams, project, placeOrders, tick };
