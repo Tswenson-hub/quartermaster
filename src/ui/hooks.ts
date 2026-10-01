@@ -1,17 +1,22 @@
-// The UI's only door into game state. Screens import from here, never from the store directly.
-//
-// SWAP POINT for the lead: replace the two mock imports below with
-//   import { useGameStore } from '../store/gameStore';
-//   import { selectForecast, selectProjection, selectPlanningParams } from '../store/selectors';
-// Everything else in this file is presentation-side shaping (grouping, sums for display).
-// Replenishment maths (MOP, D2, quantities) always comes from the engine via those selectors.
+// The UI's only door into game state. Screens import from here, never from src/store directly.
+// Everything in this file is presentation-side shaping (grouping, sums for display).
+// Replenishment maths (MOP, COP, D1/D2, quantities) always comes from the engine via src/store.
 
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import type { Day, DepotId, FiscalPeriod, GameState, ItemId, OrderProposal, ProposalDecision, SourcingRule, Vendor } from '../engine/types';
-import { useGameStore } from './mock/mockStore';
-import { selectForecast, selectPlanningParams, selectProjection } from './mock/mockSelectors';
+import type { Day, DepotId, FiscalPeriod, GameState, ItemId, OrderProposal, PlanningException, ProposalDecision, Scenario, SourcingRule, Vendor } from '../engine/types';
+import { isScenarioOver, selectCurrentPeriod, selectExceptionsToday, selectForecast, selectProjection, useGameStore } from '../store';
+import { sandboxScenario } from './mock/sandboxScenario';
 import { useUiStore } from './uiStore';
+
+// src/content may not export scenarios yet (content branch). Glob keeps the build green either way.
+const contentModules = import.meta.glob<{ scenarios?: Scenario[] }>('../content/index.ts', { eager: true });
+const contentScenarios = Object.values(contentModules)[0]?.scenarios ?? [];
+
+/** Playable levels; the UI sandbox is appended only while content has none. */
+export function useScenarioList(): Scenario[] {
+  return contentScenarios.length ? contentScenarios : [sandboxScenario];
+}
 
 export function useGame(): GameState | null {
   return useGameStore((s) => s.game);
@@ -21,9 +26,14 @@ export function useScenario() {
   return useGameStore((s) => s.scenario);
 }
 
+export function useScenarioOver(): boolean {
+  return useGameStore((s) => isScenarioOver(s.scenario, s.game));
+}
+
 export function useGameActions() {
   return useGameStore(
     useShallow((s) => ({
+      loadScenario: s.loadScenario,
       decideProposal: s.decideProposal,
       setOverride: s.setOverride,
       clearOverride: s.clearOverride,
@@ -53,7 +63,6 @@ export interface PlanningView {
   points: PlanningPoint[];
   mustOrderPoint?: number;
   canOrderPoint?: number;
-  safetyStock?: number;
   /** Today's proposal for this item-location, if any (carries D1/D2). */
   proposal?: OrderProposal;
 }
@@ -71,10 +80,10 @@ export function usePlanningView(itemId: ItemId, depotId: DepotId, pastDays = 21,
     const points: PlanningPoint[] = fc.map((f) => ({
       day: f.day,
       forecast: f.total,
-      history: f.day < game.today ? loc.history[f.day] : undefined,
+      // history's last entry is yesterday
+      history: f.day < game.today ? loc.history[loc.history.length - (game.today - f.day)] : undefined,
       projected: f.day >= game.today ? proj[f.day - game.today] : undefined,
     }));
-    const params = selectPlanningParams(game, itemId, depotId);
     const proposal = game.proposals.find((p) => p.itemId === itemId && p.depotId === depotId);
     return {
       itemId,
@@ -82,9 +91,10 @@ export function usePlanningView(itemId: ItemId, depotId: DepotId, pastDays = 21,
       today: game.today,
       onHand: loc.onHand,
       points,
-      mustOrderPoint: proposal?.mustOrderPoint ?? params?.mustOrderPoint,
-      canOrderPoint: proposal?.canOrderPoint ?? params?.canOrderPoint,
-      safetyStock: params?.safetyStock,
+      // TODO(lead): MOP/COP only arrive on proposals; a selectPlanningParams selector would let
+      // the chart draw them for items with no order today.
+      mustOrderPoint: proposal?.mustOrderPoint,
+      canOrderPoint: proposal?.canOrderPoint,
       proposal,
     };
   }, [game, itemId, depotId, pastDays, futureDays]);
@@ -175,9 +185,27 @@ export function useTreasury(): TreasuryView | null {
   const groups = useVendorGroups();
   return useMemo(() => {
     if (!game) return null;
-    const period = game.periods.find((p) => game.today >= p.start && game.today <= p.end);
+    const period = selectCurrentPeriod(game);
     const pendingToday = groups.reduce((a, g) => a + g.acceptedValue, 0);
     const remaining = period ? period.allowance - period.committed - pendingToday : 0;
     return { period, periods: game.periods, pendingToday, remaining };
   }, [game, groups]);
+}
+
+// ---------------------------------------------------------------- dispatch / KPIs
+
+export function useExceptionsToday(): PlanningException[] {
+  const game = useGame();
+  return useMemo(() => (game ? selectExceptionsToday(game) : []), [game]);
+}
+
+/** Fill rate to date (fulfilled ÷ demand across all KPIs), 0–100. 100 before any demand. */
+export function useServiceLevel(): number {
+  const game = useGame();
+  return useMemo(() => {
+    if (!game) return 100;
+    const demand = game.kpis.reduce((a, k) => a + k.demand, 0);
+    const fulfilled = game.kpis.reduce((a, k) => a + k.fulfilled, 0);
+    return demand > 0 ? Math.round((fulfilled / demand) * 1000) / 10 : 100;
+  }, [game]);
 }
