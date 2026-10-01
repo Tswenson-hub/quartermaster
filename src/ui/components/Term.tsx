@@ -57,6 +57,9 @@ export function Term({ k, children }: Props) {
             <div className="term-tip-title">{entry.term}</div>
             <div className="term-tip-flavour">{entry.flavour}</div>
             <div className="term-tip-plain">{entry.plain}</div>
+            {entry.related && (
+              <div className="term-tip-related">Related: {entry.related.map((r) => GLOSSARY[r].term.split(' — ')[0]).join(' · ')}</div>
+            )}
           </div>,
           document.body,
         )}

@@ -14,6 +14,7 @@ import {
 import type { BattlePlan } from '../../engine/types';
 import { fmtDay, fmtQty } from '../format';
 import type { PlanningView } from '../hooks';
+import { mopDriver } from '../mop';
 
 // Series colours validated (dataviz validator) against the parchment surface #efe0bd.
 const SERIES = { projected: '#2c62b0', forecast: '#c0611a', history: '#7a4fa0' };
@@ -22,6 +23,12 @@ const MUTED = '#7a6648';
 const MOP = '#a8202a';
 const COP = '#8a6a12';
 const USER_FC = '#d9a441';
+
+/** "MOP (SS)" / "MOP (fill)": which input sets MOP. */
+function mopLabel(safetyStock: number, minimumFill: number) {
+  const d = mopDriver(safetyStock, minimumFill);
+  return d === 'minimumFill' ? 'MOP (fill)' : d === 'safetyStock' ? 'MOP (SS)' : 'MOP';
+}
 
 const axisProps = {
   stroke: MUTED,
@@ -70,7 +77,7 @@ export function PlanningCharts({ view, unit, battlePlans }: Props) {
           Projected stock <span className="muted">({unit}s, end of day)</span>
         </div>
         <ResponsiveContainer width="100%" height={260}>
-          <ComposedChart data={points} syncId="planning" margin={{ top: 18, right: 56, bottom: 0, left: 0 }}>
+          <ComposedChart data={points} syncId="planning" margin={{ top: 18, right: 72, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#c9b38a" strokeDasharray="2 4" vertical={false} />
             <XAxis dataKey="day" type="number" domain={domain} allowDecimals={false} {...axisProps} tickFormatter={(d) => String(d)} />
             <YAxis {...axisProps} width={48} />
@@ -80,7 +87,15 @@ export function PlanningCharts({ view, unit, battlePlans }: Props) {
             {params && (
               <>
                 <ReferenceLine y={params.canOrderPoint} stroke={COP} strokeDasharray="6 4" strokeWidth={2} label={{ value: 'COP', position: 'right', fill: COP, fontSize: 12 }} />
-                <ReferenceLine y={params.mustOrderPoint} stroke={MOP} strokeDasharray="6 4" strokeWidth={2} label={{ value: 'MOP', position: 'right', fill: MOP, fontSize: 12 }} />
+                {/* The MOP trio's shared tint: the zone below MOP that safety stock / minimum fill protect. */}
+                <ReferenceArea y1={0} y2={params.mustOrderPoint} fill={MOP} fillOpacity={0.07} ifOverflow="hidden" />
+                <ReferenceLine
+                  y={params.mustOrderPoint}
+                  stroke={MOP}
+                  strokeDasharray="6 4"
+                  strokeWidth={2}
+                  label={{ value: mopLabel(params.safetyStock, params.minimumFill), position: 'right', fill: MOP, fontSize: 12 }}
+                />
                 <ReferenceLine x={params.d1} stroke={MUTED} strokeDasharray="2 3" label={{ value: 'D1', position: 'top', fill: INK, fontSize: 12 }} />
                 <ReferenceLine x={params.d2} stroke={INK} strokeDasharray="2 3" label={{ value: 'D2', position: 'top', fill: INK, fontSize: 12 }} />
 {params.projectedAtD2 < 0 && (
@@ -118,7 +133,7 @@ export function PlanningCharts({ view, unit, battlePlans }: Props) {
           Daily demand <span className="muted">— actual vs forecast ({unit}s/day)</span>
         </div>
         <ResponsiveContainer width="100%" height={180}>
-          <ComposedChart data={points} syncId="planning" margin={{ top: 8, right: 56, bottom: 0, left: 0 }}>
+          <ComposedChart data={points} syncId="planning" margin={{ top: 8, right: 72, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#c9b38a" strokeDasharray="2 4" vertical={false} />
             <XAxis dataKey="day" type="number" domain={domain} allowDecimals={false} {...axisProps} />
             <YAxis {...axisProps} width={48} />

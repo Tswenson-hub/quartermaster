@@ -1,5 +1,6 @@
 import type { GameState, ItemLocation } from '../../engine/types';
 import { ForecastGrid, OverridePanel } from '../components/ForecastEditor';
+import { MopTrio } from '../components/MopTrio';
 import { ItemIcon } from '../components/ItemIcon';
 import { Panel } from '../components/Panel';
 import { PlanningCharts } from '../components/PlanningCharts';
@@ -96,21 +97,17 @@ function ItemDetail({ game, loc }: { game: GameState; loc: ItemLocation }) {
         )}
         <PlanningCharts view={view} unit={item.unit} battlePlans={game.battlePlans.filter((b) => b.announcedOn <= game.today && b.depotIds.includes(loc.depotId))} />
         <p className="chart-note muted">
-          Shaded days are battle-plan windows. The dot is the stock just before the D2 delivery: the level this order must
-          keep above the MOP. A red bar below zero is demand that would go unmet.
+          Shaded days are battle-plan windows. The red-tinted band is the zone below the MOP, which is the larger of safety
+          stock (SS) and minimum fill. The dot is the stock just before the D2 delivery: the level this order must keep above
+          the MOP. A red bar below zero is demand that would go unmet.
         </p>
       </Panel>
 
       <div className="two-col">
         <Panel title="Replenishment figures" flavour="As reckoned by the clerk.">
+          {params && <MopTrio safetyStock={params.safetyStock} minimumFill={params.minimumFill} mop={params.mustOrderPoint} />}
           {params ? (
             <dl className="facts">
-              <dt><Term k="safetyStock" /></dt>
-              <dd>{fmtQty(params.safetyStock)}</dd>
-              <dt><Term k="minimumFill" /></dt>
-              <dd>{fmtQty(params.minimumFill)}</dd>
-              <dt><Term k="mop">MOP</Term> <span className="muted">larger of the two</span></dt>
-              <dd data-testid="planning-mop">{fmtQty(params.mustOrderPoint)}</dd>
               <dt><Term k="cop">COP</Term> <span className="muted">can order point</span></dt>
               <dd>{fmtQty(params.canOrderPoint)}</dd>
               <dt>Supplier</dt>

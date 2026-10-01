@@ -5,6 +5,7 @@ import { Panel } from '../components/Panel';
 import { Term } from '../components/Term';
 import { fmtDaysOfSupply, fmtOrderDays, fmtPct, fmtQty, fmtSilver } from '../format';
 import { useGameActions, useItemLocationRows, useVendorRows, type ItemLocationRow } from '../hooks';
+import { MOP_CAPTION, mopDriver } from '../mop';
 import { useUiStore } from '../uiStore';
 
 export function MasterDataScreen() {
@@ -53,8 +54,24 @@ interface Column<R> {
   /** Plain-text label for the narrow card layout. */
   text: string;
   num?: boolean;
+  /** Columns in the MOP trio share a grouped header and tint. */
+  group?: 'mop';
   sort: (r: R) => number | string;
   cell: (r: R) => ReactNode;
+}
+
+const driverOf = (r: ItemLocationRow) => mopDriver(r.stats.safetyStock, r.stats.minimumFill);
+
+/** The input that currently sets MOP: bold, with a small tag. */
+function Driven({ on, children }: { on: boolean; children: ReactNode }) {
+  return on ? (
+    <span className="mop-driver" title="Sets MOP (the larger of the two)">
+      {children}
+      <span className="sets-mop-dot" aria-label="sets MOP" />
+    </span>
+  ) : (
+    <>{children}</>
+  );
 }
 
 const dash = (v: number | undefined, f: (n: number) => string = fmtQty) => (v === undefined ? '—' : f(v));
@@ -96,22 +113,25 @@ const ITEM_COLUMNS: Column<ItemLocationRow>[] = [
     label: <Term k="safetyStock">SS</Term>,
     text: 'Safety stock',
     num: true,
+    group: 'mop',
     sort: (r) => r.stats.safetyStock ?? -1,
-    cell: (r) => dash(r.stats.safetyStock),
+    cell: (r) => <Driven on={driverOf(r) === 'safetyStock' || driverOf(r) === 'both'}>{dash(r.stats.safetyStock)}</Driven>,
   },
   {
     key: 'fill',
     label: <Term k="minimumFill">Min fill</Term>,
     text: 'Minimum fill',
     num: true,
+    group: 'mop',
     sort: (r) => r.stats.minimumFill,
-    cell: (r) => fmtQty(r.stats.minimumFill),
+    cell: (r) => <Driven on={driverOf(r) === 'minimumFill' || driverOf(r) === 'both'}>{fmtQty(r.stats.minimumFill)}</Driven>,
   },
   {
     key: 'mop',
     label: <Term k="mop">MOP</Term>,
     text: 'MOP',
     num: true,
+    group: 'mop',
     sort: (r) => r.stats.mustOrderPoint ?? -1,
     cell: (r) => dash(r.stats.mustOrderPoint),
   },
@@ -172,6 +192,35 @@ function useSorted<R>(rows: R[], columns: Column<R>[]) {
   return { sorted, sort, toggle };
 }
 
+function SortHeader<R>({
+  col,
+  sort,
+  toggle,
+  rowSpan,
+  className,
+}: {
+  col: Column<R>;
+  sort: { key: string; dir: 1 | -1 } | null;
+  toggle: (key: string) => void;
+  rowSpan?: number;
+  className?: string;
+}) {
+  return (
+    <th
+      rowSpan={rowSpan}
+      className={[col.num ? 'num' : '', className ?? ''].join(' ').trim() || undefined}
+      aria-sort={sort?.key === col.key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}
+    >
+      <button type="button" className="sort-btn" onClick={() => toggle(col.key)}>
+        {col.label}
+        <span className="sort-arrow" aria-hidden>
+          {sort?.key === col.key ? (sort.dir === 1 ? '▲' : '▼') : '↕'}
+        </span>
+      </button>
+    </th>
+  );
+}
+
 function ItemLocationsTab() {
   const rows = useItemLocationRows();
   const planItem = useUiStore((s) => s.planItem);
@@ -181,24 +230,29 @@ function ItemLocationsTab() {
     <>
       <p className="master-count" data-testid="master-item-count">
         {rows.length} active <Term k="itemLocation">item-locations</Term>
+        <span className="muted master-legend">
+          <span className="sets-mop-dot" aria-hidden /> marks the input that sets MOP · {MOP_CAPTION}
+        </span>
       </p>
       <div className="table-scroll">
         <table className="simple-table card-table master-table">
           <thead>
             <tr>
-              {ITEM_COLUMNS.map((c) => (
-                <th
-                  key={c.key}
-                  className={c.num ? 'num' : undefined}
-                  aria-sort={sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}
-                >
-                  <button type="button" className="sort-btn" onClick={() => toggle(c.key)}>
-                    {c.label}
-                    <span className="sort-arrow" aria-hidden>
-                      {sort?.key === c.key ? (sort.dir === 1 ? '▲' : '▼') : '↕'}
-                    </span>
-                  </button>
-                </th>
+              {ITEM_COLUMNS.map((c, i) => {
+                if (c.group === 'mop') {
+                  if (ITEM_COLUMNS[i - 1]?.group === 'mop') return null;
+                  return (
+                    <th key="mop-group" colSpan={ITEM_COLUMNS.filter((x) => x.group === 'mop').length} className="mop-group-head" scope="colgroup">
+                      <Term k="mop">MOP</Term> = max(SS, min fill)
+                    </th>
+                  );
+                }
+                return <SortHeader key={c.key} col={c} sort={sort} toggle={toggle} rowSpan={2} />;
+              })}
+            </tr>
+            <tr>
+              {ITEM_COLUMNS.filter((c) => c.group === 'mop').map((c) => (
+                <SortHeader key={c.key} col={c} sort={sort} toggle={toggle} className="mop-col" />
               ))}
             </tr>
           </thead>
@@ -219,7 +273,11 @@ function ItemLocationsTab() {
                 title="Open in Item Planning"
               >
                 {ITEM_COLUMNS.map((c) => (
-                  <td key={c.key} className={c.num ? 'num' : c.key === 'item' ? 'cell-item' : undefined} data-label={c.text}>
+                  <td
+                    key={c.key}
+                    className={[c.num ? 'num' : c.key === 'item' ? 'cell-item' : '', c.group === 'mop' ? 'mop-col' : ''].join(' ').trim() || undefined}
+                    data-label={c.text}
+                  >
                     {c.cell(r)}
                   </td>
                 ))}

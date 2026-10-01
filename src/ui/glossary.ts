@@ -42,6 +42,8 @@ export interface GlossaryEntry {
   term: string;
   flavour: string;
   plain: string;
+  /** Terms to read alongside this one (shown as "Related" in the tooltip). */
+  related?: TermKey[];
 }
 
 export const GLOSSARY: Record<TermKey, GlossaryEntry> = {
@@ -50,12 +52,14 @@ export const GLOSSARY: Record<TermKey, GlossaryEntry> = {
     flavour: 'The line below which the camp starves.',
     plain:
       'The lowest stock you may let an item fall to: the larger of the safety stock (from how much demand varies) and the minimum fill you set. If projected stock at D2 is below the MOP, you must order today.',
+    related: ['safetyStock', 'minimumFill', 'd2'],
   },
   cop: {
     term: 'COP — Can Order Point',
     flavour: 'Not hungry yet, but the cart has room.',
     plain:
       'A level above the MOP. Items between MOP and COP do not need an order today, but may be added to fill up a supplier’s minimum order.',
+    related: ['mop'],
   },
   d1: {
     term: 'D1 — First delivery date',
@@ -79,12 +83,14 @@ export const GLOSSARY: Record<TermKey, GlossaryEntry> = {
     flavour: 'Spare sacks against a bad week.',
     plain:
       'Extra stock held to cover demand being higher than forecast or a late delivery. Higher service level and more uncertain demand mean more safety stock.',
+    related: ['mop', 'minimumFill', 'serviceLevel'],
   },
   minimumFill: {
     term: 'Minimum fill',
     flavour: 'One full cart always in sight of the men.',
     plain:
       'A floor you set for an item, in units. The Must Order Point is whichever is larger: this, or the safety stock worked out from how much demand varies.',
+    related: ['mop', 'safetyStock'],
   },
   projected: {
     term: 'Projected stock',
