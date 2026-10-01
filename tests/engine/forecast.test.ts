@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { baselineFromHistory, forecast, forecastErrorStdDev, oneStepBaselines } from '../../src/engine/forecast';
+import { planningParams } from '../../src/engine/replenishment';
 import { rules, type Rules } from '../../src/engine/rules.config';
 import type { BattlePlan } from '../../src/engine/types';
 import { flat, loc, state } from './fixtures';
@@ -106,5 +107,52 @@ describe('forecast', () => {
 
   it('throws for an unknown item-location', () => {
     expect(() => forecast(state(), 'salt', 'camp', 0, 0)).toThrow();
+  });
+});
+
+describe('overrides are the forecast (§8)', () => {
+  const ov = (from: number, to: number, mode: 'absolute' | 'aggregate' | 'factor', value: number) => ({
+    itemId: 'grain',
+    depotId: 'camp',
+    from,
+    to,
+    mode,
+    value,
+  });
+
+  it('absolute replaces baseline + uplift on its days', () => {
+    const s = state({ battlePlans: [plan()], overrides: [ov(3, 3, 'absolute', 7)] });
+    expect(forecast(s, 'grain', 'camp', 2, 4).map((p) => p.total)).toEqual([15, 7, 15]);
+  });
+
+  it('aggregate 70 over days 2–8 on a flat baseline → 10/day', () => {
+    const f = forecast(state({ overrides: [ov(2, 8, 'aggregate', 70)] }), 'grain', 'camp', 1, 9);
+    expect(f.map((p) => p.total)).toEqual([10, 10, 10, 10, 10, 10, 10, 10, 10]);
+    expect(forecast(state({ overrides: [ov(2, 8, 'aggregate', 35)] }), 'grain', 'camp', 2, 2)[0].override).toBe(5);
+  });
+
+  it('aggregate breaks out in proportion to the baseline (incl. past days)', () => {
+    // Today = 2. Baselines: day 0 = 10, day 1 = 12, day 2 = 13.6 (sum 35.6).
+    const s = state({ today: 2, locations: [loc('grain', { history: [...flat(10), 20, 20] })], overrides: [ov(0, 2, 'aggregate', 71.2)] });
+    const f = forecast(s, 'grain', 'camp', 0, 2).map((p) => p.total);
+    expect(f[0]).toBeCloseTo(20, 10);
+    expect(f[1]).toBeCloseTo(24, 10);
+    expect(f[2]).toBeCloseTo(27.2, 10);
+  });
+
+  it('aggregate on a zero baseline splits evenly', () => {
+    const s = state({ locations: [loc('grain', { history: flat(0) })], overrides: [ov(0, 3, 'aggregate', 20)] });
+    expect(forecast(s, 'grain', 'camp', 0, 3).map((p) => p.total)).toEqual([5, 5, 5, 5]);
+  });
+
+  it('later overrides win day by day', () => {
+    const s = state({ overrides: [ov(0, 6, 'aggregate', 140), ov(2, 3, 'absolute', 1)] });
+    expect(forecast(s, 'grain', 'camp', 0, 6).map((p) => p.total)).toEqual([20, 20, 1, 1, 20, 20, 20]);
+  });
+
+  it('the override drives proposals (orders are based on it)', () => {
+    // Override 0/day through D2 − 1 → projection stays at 70 (would be 10 on the baseline).
+    const s = state({ locations: [loc('grain', { onHand: 70 })], overrides: [ov(0, 5, 'absolute', 0)] });
+    expect(planningParams(s, 'grain', 'camp')?.projectedAtD2).toBe(70);
   });
 });

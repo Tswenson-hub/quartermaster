@@ -62,12 +62,6 @@ export function findLocation(state: GameState, itemId: ItemId, depotId: DepotId)
   return loc;
 }
 
-/** History as it stood on the morning of `asOf` (≤ today). */
-function historyAsOf(loc: ItemLocation, today: Day, asOf: Day): readonly number[] {
-  const drop = today - asOf;
-  return drop <= 0 ? loc.history : loc.history.slice(0, Math.max(0, loc.history.length - drop));
-}
-
 /**
  * Daily forecast for days from..to inclusive. Future days use the baseline as of today;
  * past days use the one-step-ahead baseline as of that day (for forecast-vs-actual charts).
@@ -81,10 +75,17 @@ export function forecastLocation(
   r: Rules = defaultRules,
 ): ForecastPoint[] {
   const points: ForecastPoint[] = [];
-  const todayBaseline = baselineFromHistory(loc.history, r);
+  // One-step baselines over the whole history: entry i is the forecast for the day
+  // (len − i) days before today; the last entry is today's (and every future day's) baseline.
+  const steps = oneStepBaselines(loc.history, r);
+  const baselineOn = (day: Day): number => {
+    if (day >= state.today) return steps[steps.length - 1];
+    return steps[Math.max(0, steps.length - 1 - (state.today - day))];
+  };
+  const overrides = state.overrides.filter((o) => o.itemId === loc.itemId && o.depotId === loc.depotId);
   for (let day = from; day <= to; day++) {
     const asOf = Math.min(day, state.today);
-    const baseline = day >= state.today ? todayBaseline : baselineFromHistory(historyAsOf(loc, state.today, day), r);
+    const baseline = baselineOn(day);
 
     const plans = state.battlePlans.filter(
       (p) =>
@@ -102,17 +103,30 @@ export function forecastLocation(
       eventUplift = plans.reduce((s, p) => s + p.statedUplift[loc.itemId], 0);
     }
 
-    // Overlapping overrides: the last one in the list wins.
+    // A player override IS the forecast on its days (§8). Overlaps: the last one wins.
     let override: number | undefined;
-    for (const o of state.overrides) {
-      if (o.itemId !== loc.itemId || o.depotId !== loc.depotId || day < o.from || day > o.to) continue;
-      override = o.mode === 'absolute' ? o.value : (baseline + eventUplift) * o.value;
+    for (const o of overrides) {
+      if (day < o.from || day > o.to) continue;
+      if (o.mode === 'absolute') override = o.value;
+      else if (o.mode === 'factor') override = (baseline + eventUplift) * o.value;
+      else override = aggregateShare(o.value, o.from, o.to, day, baselineOn);
     }
 
     const total = Math.max(0, override ?? baseline + eventUplift);
     points.push(override === undefined ? { day, baseline, eventUplift, total } : { day, baseline, eventUplift, override, total });
   }
   return points;
+}
+
+/**
+ * 'aggregate' override: `total` over from..to broken out in proportion to each day's baseline
+ * (evenly if the baseline is zero throughout).
+ */
+function aggregateShare(total: number, from: Day, to: Day, day: Day, baselineOn: (d: Day) => number): number {
+  let sum = 0;
+  for (let d = from; d <= to; d++) sum += baselineOn(d);
+  const days = to - from + 1;
+  return sum > 0 ? (total * baselineOn(day)) / sum : total / days;
 }
 
 export function forecast(
