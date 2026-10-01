@@ -231,7 +231,7 @@ export interface DailyKpi {
   forecast: number;
   /** Sum over locations of |actual demand − forecast| that day. SWAPE = Σ absError / Σ demand (§10). */
   absError: number;
-  /** End-of-day on hand ÷ next day's forecast, summed over locations (days of supply, §10). */
+  /** Days of supply (§10): Σ end-of-day on hand ÷ Σ mean daily forecast, over all locations (not a mean of ratios). */
   daysOfSupply: number;
 }
 
@@ -270,7 +270,7 @@ export interface VendorPlan {
   minimum?: number;
   /** Effective trigger: GameState.vendorTriggers ?? Vendor.orderTrigger ?? rules default. */
   trigger: number;
-  /** need ÷ minimum (1 when there is no minimum). */
+  /** Exactly need ÷ minimum, both as above (1 when there is no minimum). Compared with `trigger`. */
   ratio: number;
   /**
    * 'no-minimum' | 'meets-minimum' (need ≥ minimum) | 'built' (ratio ≥ trigger, built up to the minimum
