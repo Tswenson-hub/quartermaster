@@ -19,11 +19,9 @@ describe('playthrough: accept every proposal', () => {
     });
   }
 
-  // Accepting every system proposal should never starve the front. Blocked on the engine's
-  // lost-sales clamp making projectedAtD2 = 0, which sizes orders to MOP only (tutorial-2: 52%).
-  // Engine: un-skip once order sizing is fixed.
+  // Accepting every system proposal should never starve the front.
   for (const scenario of scenarios) {
-    it.skip(`${scenario.id} keeps service level ≥ 95% when all proposals are accepted`, () => {
+    it(`${scenario.id} keeps service level ≥ 95% when all proposals are accepted`, () => {
       const s = useGameStore.getState();
       s.loadScenario(scenario);
       for (let d = 0; d < scenario.lengthDays; d++) {
