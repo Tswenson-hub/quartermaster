@@ -5,6 +5,30 @@ import type { GameState, Scenario } from '../../src/engine/types';
 /** Order-trigger lessons deliberately set triggers too high; the player is expected to lower them. */
 export const isTriggerLesson = (scenario: Scenario) => scenario.teaches.includes('order trigger');
 
+/** Forecast-override lessons hide or understate a surge; the player is expected to override it. */
+export const isOverrideLesson = (scenario: Scenario) => scenario.teaches.includes('forecast override');
+
+/**
+ * The player action a lesson expects, applied before accept-all (mirrors tests/store/playthrough.test.ts):
+ * - 'order trigger': lower every vendor's trigger to the rules default (via acceptAll's lowerTriggers);
+ * - 'forecast override': override the surge correctly, simulated as statedUplift = actualUplift.
+ */
+export function asPlayerWouldFix(scenario: Scenario): { scenario: Scenario; lowerTriggers: boolean; note: string } {
+  const lowerTriggers = isTriggerLesson(scenario);
+  const override = isOverrideLesson(scenario);
+  const fixed: Scenario = override
+    ? {
+        ...scenario,
+        initial: {
+          ...scenario.initial,
+          battlePlans: scenario.initial.battlePlans.map((b) => ({ ...b, statedUplift: b.actualUplift })),
+        },
+      }
+    : scenario;
+  const note = lowerTriggers ? ' (triggers lowered)' : override ? ' (surge overridden)' : '';
+  return { scenario: fixed, lowerTriggers, note };
+}
+
 /**
  * Play a scenario accepting every proposal with qty > 0. With `lowerTriggers`, the player first
  * sets every vendor's order trigger to rules.vendorMinimum.defaultTrigger (as in the store test).

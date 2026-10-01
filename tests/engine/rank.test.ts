@@ -137,3 +137,54 @@ describe('game status', () => {
     expect(run()).toEqual(run());
   });
 });
+
+describe('letter facts (rank after each event)', () => {
+  const facts = (s: GameState) => s.letters.map((l) => [l.kind, l.facts]);
+
+  it('reprimand then demotion: period figures; rank after each step', () => {
+    const s = tick(closing(106, { rank: rank({ reprimands: 1, merit: 1 }) }), q);
+    expect(facts(s)).toEqual([
+      ['reprimand', { rankLevel: 2, periodIndex: 0, committed: 106, allowance: 100, serviceLevel: 1, reprimands: 2, merit: 1 }],
+      ['demotion', { rankLevel: 1, periodIndex: 0, committed: 106, allowance: 100, serviceLevel: 1, reprimands: 0, merit: 0 }],
+    ]);
+  });
+
+  it('commendation then promotion', () => {
+    const s = tick(closing(100, { rank: rank({ merit: 2, reprimands: 1 }) }), q);
+    expect(facts(s)).toEqual([
+      ['commendation', { rankLevel: 2, periodIndex: 0, committed: 100, allowance: 100, serviceLevel: 1, reprimands: 1, merit: 3 }],
+      ['promotion', { rankLevel: 3, merit: 0, reprimands: 0 }],
+    ]);
+  });
+
+  it('battle won / lost carry the window service level', () => {
+    expect(facts(tick(state({ battlePlans: [battle()] }), q))).toEqual([
+      ['battle-won', { rankLevel: 2, serviceLevel: 1, merit: 2, reprimands: 0 }],
+    ]);
+    const lost = tick(state({ rank: rank({ level: 0 }), battlePlans: [battle()], locations: [loc('grain', { onHand: 15 })] }), q);
+    expect(facts(lost)).toEqual([
+      ['battle-lost', { rankLevel: 0, serviceLevel: 0.75, merit: 0, reprimands: 0 }],
+      ['demotion', { rankLevel: -1, serviceLevel: 0.75, reprimands: 0, merit: 0 }],
+      ['game-over', { rankLevel: -1 }],
+    ]);
+    expect(lost.letters[1].battlePlanId).toBe('ford');
+  });
+
+  it('every letter has facts', () => {
+    const s = tick(closing(106, { rank: rank({ level: 0, reprimands: 1 }) }), q);
+    expect(s.letters.length).toBeGreaterThan(0);
+    expect(s.letters.every((l) => l.facts !== undefined)).toBe(true);
+  });
+});
+
+describe('per-plan winServiceLevel', () => {
+  // 15 of 20 served = 75%: lost at the 90% default, won if the plan only asks for 70%.
+  const short = (winServiceLevel?: number) =>
+    tick(state({ battlePlans: [battle({ winServiceLevel })], locations: [loc('grain', { onHand: 15 })] }), q).battles[0];
+
+  it('plan.winServiceLevel ?? rules.rank.battleWinServiceLevel', () => {
+    expect(short().won).toBe(false);
+    expect(short(0.7)).toMatchObject({ won: true, serviceLevel: 0.75 });
+    expect(short(0.8).won).toBe(false);
+  });
+});
