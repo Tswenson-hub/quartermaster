@@ -316,6 +316,9 @@ const tutorial: ScenarioSpec[] = [
     teaches: ['order trigger', 'below-trigger (no proposal)', 'adjusting the trigger', 'lead time risk'],
     seed: 1606,
     lengthDays: 28,
+    // No warm-up: a predecessor on the default 0.8 trigger would never order, so the garrison would
+    // be out of shoes by takeover. The player arrives with stock in hand and time to act.
+    warmupDays: 0,
     periodLengthDays: 28,
     allowanceFactor: 1.3,
     vendorIds: ['mountain-smithy'],
