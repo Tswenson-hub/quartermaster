@@ -174,6 +174,11 @@ export interface OrderProposal {
   vendorId: VendorId;
   qty: number;
   reason: ProposalReason;
+  /**
+   * Units of `qty` added by the vendor-minimum trigger build beyond this line's real need (RELEX_RULES §4).
+   * qty − builtQty is the real need after pack rounding. 0 or absent = no build on this line.
+   */
+  builtQty?: number;
   /** Delivery date of this order. */
   d1: Day;
   /** Delivery date of the next order opportunity — the coverage horizon. */
