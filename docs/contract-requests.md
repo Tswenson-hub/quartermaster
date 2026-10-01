@@ -15,7 +15,8 @@ Proposed changes to `src/engine/types.ts`. Lead records the decision under each 
    `surcharge` (silver, included in `cost`) on that line. Engine change is one line once added.
 
 ## Open — product owner decision
-7. **Lead-time variability in safety stock** (engine FYI). With reliability-driven delays live, accept-all service dips slightly
+7. **Lead-time variability in safety stock** — **Decided by owner 2026-10-01: safety stock covers forecast error only.**
+   Start with the current (high) service levels and adjust later. No engine change. Original note (engine FYI): With reliability-driven delays live, accept-all service dips slightly
    (tutorial-3 99.5%, tutorial-4 99.3%, tutorial-7 97.8%, sandbox 98.2%; all still ≥ 95%). Safety stock covers forecast error only.
    If the product owner wants RELEX-style LT-variance safety stock, `rules.safetyStock` would need reliability/lateDays inputs.
 
