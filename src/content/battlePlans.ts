@@ -92,11 +92,11 @@ export const BATTLE_PLANS: BattlePlan[] = [
     announcedOn: 3,
     start: 14,
     end: 34,
-    winServiceLevel: 0.9,
+    winServiceLevel: 0.95,
     depotIds: ['eastern-camp'],
     // No figures in the letter, so the system forecast gets no uplift. The player must override it.
     statedUplift: {},
-    actualUplift: { grain: 1.75, ale: 1.8, bandages: 1.4 },
+    actualUplift: { grain: 2.0, ale: 2.1, bandages: 1.5 },
   },
 ];
 

@@ -42,13 +42,15 @@ produces the same numbers.
 
 Checked against the real engine with two strategies. **Accept-all** accepts every proposal.
 **Careful** also judges each letter correctly (stated uplift = actual uplift). Levels that teach
-`order trigger` are also checked with every trigger lowered to 0.5, as the lead's tests do.
+`order trigger` are also checked with every trigger lowered to 0.5, and `forecast override` levels
+with statedUplift = actualUplift, as the lead's tests do. Battle thresholds come from
+`BattlePlan.winServiceLevel`.
 
 | Level | Accept-all, easy / normal / hard | Notes |
 |---|---|---|
 | I–V, VII | service 97–100%, budget used 46–100% | No letters beyond commendations. |
 | VI (trigger) | service ~42% at the default 0.8 trigger (no proposal ever fires); 100% with trigger 0.5 | Lesson: lower the smith's trigger. |
-| VIII (override) | service 95.8 / 97.3 / 97.8%; levies battle won at 94–97% | Accept-all must stay ≥ 95%, so the unannounced surge (grain ×1.75, ale ×1.8) is kept moderate. Careful: 99%. |
+| VIII (override) | service 94.2 / 95.7 / 96.4%; **levies battle lost** (92–95% against a 0.95 bar), demoted to rank 1 | The surge (grain ×2) never appears in the forecast. Careful (overrides correctly): 99% service, battle won, rank 3 on easy and normal; on hard, won but rank 2 (104% of budget). The tests apply the correct override to `forecast override` lessons. |
 | IX (letters, budget) | easy and normal: battles won, rank 2 → 4, no reprimands. Hard: 2 reprimands (136% / 109% of budget) | The careful player stays on budget on normal; on hard they are still reprimanded but win both battles. |
 | Sandbox | easy and normal: rank 2 → 4, **winter crossing lost** (understated letter). Hard: 2 reprimands, crossing lost, rank 3 | Careful: rank 6 on normal, rank 5 on hard, all 4 battles won. |
 
@@ -100,10 +102,10 @@ Checked against the real engine with two strategies. **Accept-all** accepts ever
 | feast-muster | eastern-camp | d22 → d32–34 | ale 3, grain 1.5 | 1.6, 1.15 | exaggerated |
 | winter-crossing | northern-pass | d42 → d52–65 | oats 1.5, horseshoes 1.5 | 2.1, 2.6 | **under-stated** |
 | ford-feint | eastern-camp | d70 → d80–84 | arrows 1.8, bolts 1.8, bowstrings 1.33 | 1.85, 1.7, 1.35 | accurate |
-| levies-arrive | eastern-camp | d3 → d14–34 | *(no figures)* | grain 1.75, ale 1.8, bandages 1.4 | **silent**: needs a forecast override |
+| levies-arrive | eastern-camp | d3 → d14–34 | *(no figures)* | grain 2.0, ale 2.1, bandages 1.5 | **silent**: needs a forecast override |
 
 Each plan ends in a battle. `BattlePlan.winServiceLevel` is the service level its depots need
-over the window to win: the assault needs 0.92, the feast 0.85, and the others 0.9. `BATTLES` in
+over the window to win: the assault needs 0.92, the feast 0.85, the levies 0.95, and the others 0.9. `BATTLES` in
 `battlePlans.ts` holds the flavour: name, key items, and victory and defeat lines (rendered by the
 store's `selectLetterText`).
 

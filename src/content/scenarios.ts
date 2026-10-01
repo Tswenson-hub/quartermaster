@@ -352,7 +352,7 @@ const tutorial: ScenarioSpec[] = [
     seed: 1808,
     lengthDays: 35,
     periodLengthDays: 35,
-    allowanceFactor: 1.25,
+    allowanceFactor: 1.35,
     vendorIds: ['abbey-granary', 'river-merchants', 'apothecary'],
     lines: [
       { itemId: 'grain', depotId: 'eastern-camp', onHandDays: 6 },
