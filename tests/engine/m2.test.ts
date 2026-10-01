@@ -1,4 +1,4 @@
-// M2: lot-based spoilage, reliability-driven late deliveries, vendor-minimum surcharge.
+// M2: lot-based spoilage, reliability-driven late deliveries, no vendor-minimum surcharge.
 import { describe, expect, it } from 'vitest';
 import { addLot, consume, expire, lotsOf } from '../../src/engine/lots';
 import { placeOrders, refresh, tick } from '../../src/engine/tick';
@@ -115,6 +115,5 @@ describe('placeOrders after CO-MRP', () => {
     expect(s0.proposals.map((p) => [p.reason, p.qty])).toEqual([['must', 40]]);
     const s = placeOrders(s0, [{ index: 0, decision: 'accepted', qty: 20 }], q);
     expect(s.openOrders).toEqual([expect.objectContaining({ qty: 20, cost: 40 })]);
-    expect(s.openOrders[0].surcharge).toBeUndefined();
   });
 });

@@ -43,12 +43,8 @@ export interface Vendor {
   orderDays: Weekday[];
   /** Days from order to delivery at the depot. */
   leadTimeDays: number;
-  /**
-   * Vendor minimum order, if any (RELEX_RULES §4, §6).
-   * `surcharge` is DEPRECATED: the below-minimum surcharge path was removed by the owner. Stop reading
-   * and writing it; the lead deletes the field once no code uses it.
-   */
-  minimum?: { kind: 'value' | 'units'; amount: number; /** @deprecated removed by RELEX_RULES §4 */ surcharge?: number };
+  /** Vendor minimum order, if any (RELEX_RULES §4, §6). */
+  minimum?: { kind: 'value' | 'units'; amount: number };
   /**
    * Default order trigger for a vendor with a minimum: the fraction (0–1+) of the minimum that the real
    * need must reach before the system builds the order up to the minimum. Below it, no proposal is made
@@ -161,10 +157,7 @@ export interface OpenOrder {
   qty: number;
   orderedOn: Day;
   deliveryOn: Day;
-  /** Total cost of the line, including `surcharge` if any. */
   cost: number;
-  /** @deprecated The below-minimum surcharge path was removed (RELEX_RULES §4). Lead deletes this once unused. */
-  surcharge?: number;
 }
 
 export type ProposalReason = 'must' | 'can' | 'vendor-min-fill' | 'manual';

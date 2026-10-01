@@ -54,19 +54,17 @@ export function selectServiceLevel(game: GameState): number {
 }
 
 export interface DecisionPreview {
-  /** Orders that would be placed if the day ended now (surcharges included in cost). */
+  /** Orders that would be placed if the day ended now. */
   orders: OpenOrder[];
-  /** Total value of those orders, incl. surcharges. */
+  /** Total value of those orders. */
   spend: number;
-  /** @deprecated Always 0 once the engine drops the surcharge path (RELEX_RULES §4). */
-  surcharges: number;
-  /** Indices of accepted proposals the engine would drop (e.g. below vendor minimum with no surcharge). */
+  /** Indices of accepted proposals the engine would not place. */
   dropped: number[];
 }
 
 /**
  * What ending the day would order, computed by the engine's own placeOrders on today's decisions.
- * Use this for pending spend / minimum / surcharge displays instead of re-deriving vendor rules in UI.
+ * Use this for pending spend / minimum displays instead of re-deriving vendor rules in UI.
  */
 export function selectDecisionPreview(game: GameState, decisions: Record<number, DecisionEntry>): DecisionPreview {
   const inputs: ProposalDecisionInput[] = Object.entries(decisions).map(([i, d]) => ({ index: Number(i), ...d }));
@@ -83,7 +81,6 @@ export function selectDecisionPreview(game: GameState, decisions: Record<number,
   return {
     orders,
     spend: orders.reduce((a, o) => a + o.cost, 0),
-    surcharges: orders.reduce((a, o) => a + (o.surcharge ?? 0), 0),
     dropped,
   };
 }

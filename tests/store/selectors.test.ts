@@ -16,7 +16,6 @@ describe('selectDecisionPreview', () => {
     const preview = selectDecisionPreview(game, { 0: { decision: 'accepted' } });
     expect(preview.orders).toHaveLength(1);
     expect(preview.spend).toBe(game.proposals[0].cost);
-    expect(preview.surcharges).toBe(0);
     expect(preview.dropped).toEqual([]);
   });
 
