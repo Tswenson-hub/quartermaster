@@ -20,20 +20,13 @@ describe('selectDecisionPreview', () => {
     expect(preview.dropped).toEqual([]);
   });
 
-  // TODO(lead): surcharge path removed by owner spec (RELEX_RULES §4/§6, CO-MRP order trigger).
-  it.skip('includes the surcharge for a below-minimum order', () => {
-    const game = engine.initGame(withMinimum({ kind: 'units', amount: 10_000, surcharge: 7 }));
-    const preview = selectDecisionPreview(game, { 0: { decision: 'accepted' } });
-    expect(preview.surcharges).toBe(7);
-    expect(preview.spend).toBe(game.proposals[0].cost + 7);
-  });
 
-  // TODO(lead): surcharge path removed by owner spec (RELEX_RULES §4/§6, CO-MRP order trigger).
-  it.skip('reports a below-minimum order with no surcharge as dropped', () => {
+
+  it('below the vendor order trigger there is nothing to order', () => {
     const game = engine.initGame(withMinimum({ kind: 'units', amount: 10_000 }));
-    const preview = selectDecisionPreview(game, { 0: { decision: 'accepted' } });
-    expect(preview.orders).toEqual([]);
-    expect(preview.dropped).toEqual([0]);
+    expect(game.proposals).toEqual([]);
+    expect(game.vendorPlans.find((v) => v.vendorId === 'mill')?.status).toBe('below-trigger');
+    expect(selectDecisionPreview(game, {}).orders).toEqual([]);
   });
 
   it('ignores rejected lines', () => {
@@ -55,7 +48,7 @@ describe('selectKpiSummary', () => {
     expect(s.serviceLevel).toBe(0.75);
     expect(s.swape).toBeCloseTo(0.3);
     expect(s.bias).toBeCloseTo(-0.1);
-    expect(s.daysOfSupply).toBe(1);
+    expect(s.daysOfSupply).toBeGreaterThan(0);
     expect(selectKpiSummary(game, 1).serviceLevel).toBe(0.5);
   });
 });

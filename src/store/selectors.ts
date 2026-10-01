@@ -12,6 +12,7 @@ import type {
   ProposalDecisionInput,
 } from '../engine/types';
 import type { DecisionEntry } from './gameStore';
+import { kpiSummary, type KpiSummary } from '../engine/kpi';
 import { rules } from '../engine/rules.config';
 import { engine } from './engine';
 
@@ -84,36 +85,14 @@ export function selectDecisionPreview(game: GameState, decisions: Record<number,
   };
 }
 
-export interface KpiSummary {
-  demand: number;
-  fulfilled: number;
-  /** fulfilled ÷ demand, 0–1; 1 when there has been no demand. */
-  serviceLevel: number;
-  /** Days of supply at the end of the last ticked day (on hand ÷ next day's forecast). */
-  daysOfSupply: number;
-  /** Units spoiled. */
-  spoiled: number;
-  /** Σ|actual − forecast| ÷ Σ actual (RELEX_RULES §10). 0 = perfect. */
-  swape: number;
-  /** (Σ forecast − Σ actual) ÷ Σ actual. Positive = over-forecasting, negative = under. */
-  bias: number;
-}
+export type { KpiSummary };
 
-/** KPIs over ticked days from `fromDay` (default: the whole game so far). */
-export function selectKpiSummary(game: GameState, fromDay: Day = 0): KpiSummary {
-  const ks = game.kpis.filter((k) => k.day >= fromDay);
-  const sum = (f: (k: (typeof ks)[number]) => number) => ks.reduce((a, k) => a + f(k), 0);
-  const demand = sum((k) => k.demand);
-  const fulfilled = sum((k) => k.fulfilled);
-  return {
-    demand,
-    fulfilled,
-    serviceLevel: demand === 0 ? 1 : fulfilled / demand,
-    daysOfSupply: ks.at(-1)?.daysOfSupply ?? 0,
-    spoiled: sum((k) => k.spoiled),
-    swape: demand === 0 ? 0 : sum((k) => k.absError) / demand,
-    bias: demand === 0 ? 0 : (sum((k) => k.forecast) - demand) / demand,
-  };
+/**
+ * Campaign KPIs (RELEX_RULES §10): service level, days of supply, spoilage, holding cost, SWAPE, bias.
+ * Computed by the engine. `lastDays` limits the KPI rows used (e.g. 28 for the current period).
+ */
+export function selectKpiSummary(game: GameState, lastDays?: number): KpiSummary {
+  return kpiSummary(game, lastDays);
 }
 
 export interface DifficultyOption {
