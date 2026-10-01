@@ -4,12 +4,6 @@ import { Term } from '../components/Term';
 import { getApiKey, setApiKey, useDifficultyOptions, useGameActions, useScenarioList, useStarting } from '../hooks';
 import { useUiStore } from '../uiStore';
 
-const DIFFICULTY_FLAVOUR: Record<Difficulty, string> = {
-  easy: 'A steady market and a generous Treasurer.',
-  normal: 'Honest weather, honest coin.',
-  hard: 'Wild markets and a miserly purse.',
-};
-
 export function TitleScreen() {
   const scenarios = useScenarioList();
   const options = useDifficultyOptions();
@@ -39,11 +33,13 @@ export function TitleScreen() {
               data-testid={`difficulty-${o.id}`}
               onClick={() => setDifficulty(o.id)}
             >
-              <span className="difficulty-label">{o.label}</span>
+              <span className="difficulty-label">
+                {o.title} <span className="muted">· {o.label}</span>
+              </span>
+              <span className="difficulty-flavour">{o.description}</span>
               <span className="difficulty-meta">
                 <Term k="market">Market</Term> {o.ticker} · budget ×{o.budgetFactor}
               </span>
-              <span className="difficulty-flavour">{DIFFICULTY_FLAVOUR[o.id]}</span>
             </button>
           ))}
         </div>
@@ -73,6 +69,10 @@ export function TitleScreen() {
             </li>
           ))}
         </ul>
+        <p className="credits muted small">
+          Icons: Raven Fantasy Icons by Clockwork Raven Studios · Tiles: Kenney (kenney.nl) · Fonts: Pixelify Sans, IM Fell
+          English
+        </p>
       </div>
       {starting && (
         <div className="starting-overlay" role="status" aria-live="polite">

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { fmtDay } from '../format';
-import { useGame } from '../hooks';
+import { useGame, useLetterTexts } from '../hooks';
 import { useUiStore } from '../uiStore';
 import { Sprite } from './Sprite';
 import { Term } from './Term';
@@ -11,13 +11,16 @@ export function BattleReport() {
   const seen = useUiStore((s) => s.seenBattles);
   const seeBattle = useUiStore((s) => s.seeBattle);
   const go = useUiStore((s) => s.go);
+  const letters = useLetterTexts();
   const closeRef = useRef<HTMLButtonElement>(null);
   const outcome = game?.battles.find((b) => !seen[b.battlePlanId]);
   useEffect(() => closeRef.current?.focus(), [outcome?.battlePlanId]);
   if (!game || !outcome) return null;
 
   const plan = game.battlePlans.find((b) => b.id === outcome.battlePlanId);
-  const letter = game.letters.find((l) => l.battlePlanId === outcome.battlePlanId && (l.kind === 'battle-won' || l.kind === 'battle-lost'));
+  const letter = letters.find(
+    ({ letter: l }) => l.battlePlanId === outcome.battlePlanId && (l.kind === 'battle-won' || l.kind === 'battle-lost'),
+  )?.text;
   const close = () => seeBattle(outcome.battlePlanId);
 
   return (
