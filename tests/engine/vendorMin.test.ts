@@ -1,67 +1,131 @@
+// CO-MRP: order trigger + build to vendor minimum, one pack at a time (RELEX_RULES §4, §6).
 import { describe, expect, it } from 'vitest';
 import { generatePlanLines } from '../../src/engine/replenishment';
 import { rules, type Rules } from '../../src/engine/rules.config';
 import type { Vendor } from '../../src/engine/types';
-import { applyVendorMinimums } from '../../src/engine/vendorMin';
+import { applyVendorMinimums, buildToMinimum, type BuildCandidate } from '../../src/engine/vendorMin';
 import { item, loc, source, state, vendor } from './fixtures';
 
-// A: on hand 70 → proj 10, must 30.  B: 110 → proj 50 (5.0 days cover).  C: 105 → proj 45 (4.5 days).
-// All: MOP 40, COP 70, pack 10, unit cost 2.
+// All items: forecast 10/day, MOP 40, pack 10, unit cost 2. Monday order, D2 check = end of day 5.
+//   a: on hand 70  → proj 10  → must 30 (days of cover with the 30: 4.0)
+//   b: on hand 110 → proj 50  → 5.0 days
+//   c: on hand 105 → proj 45  → 4.5 days
+//   d: on hand 250 → proj 190 → 19.0 days
 function setup(minimum: Vendor['minimum'], extra = {}) {
   const s = state({
-    items: { a: item('a'), b: item('b'), c: item('c') },
+    items: { a: item('a'), b: item('b'), c: item('c'), d: item('d') },
     vendors: { v: vendor('v', { minimum }) },
-    sourcing: ['a', 'b', 'c'].map((id) => source(id, 'v', { packSize: 10 })),
-    locations: [loc('a', { onHand: 70 }), loc('b', { onHand: 110 }), loc('c', { onHand: 105 })],
+    sourcing: ['a', 'b', 'c', 'd'].map((id) => source(id, 'v', { packSize: 10 })),
+    locations: [loc('a', { onHand: 70 }), loc('b', { onHand: 110 }), loc('c', { onHand: 105 }), loc('d', { onHand: 250 })],
     ...extra,
   });
   return { s, lines: generatePlanLines(s) };
 }
-const qtys = (lines: ReturnType<typeof generatePlanLines>) =>
-  Object.fromEntries(lines.map((l) => [l.proposal.itemId, [l.proposal.reason, l.proposal.qty]]));
+const run = (minimum: Vendor['minimum'], trigger: number, r: Rules = rules, extra = {}) => {
+  const { s, lines } = setup(minimum, extra);
+  return applyVendorMinimums(s, lines, () => trigger, r);
+};
+const table = (ps: { itemId: string; reason: string; qty: number }[]) => ps.map((p) => [p.itemId, p.reason, p.qty]);
 
-describe('vendor minimums', () => {
-  it('raw proposals: A must 30, B and C can with qty 0', () => {
-    expect(qtys(setup(undefined).lines)).toEqual({ a: ['must', 30], b: ['can', 0], c: ['can', 0] });
+describe('CO-MRP build to minimum (golden)', () => {
+  it('need 30 of 100 = 30% < 50% trigger → no order, shortfall explains the trigger', () => {
+    const out = run({ kind: 'units', amount: 100 }, 0.5);
+    expect(out.proposals).toEqual([]);
+    expect(out.exceptions).toEqual([
+      expect.objectContaining({
+        kind: 'vendor-min-shortfall',
+        vendorId: 'v',
+        message: 'v: must-order need is 30% of the 100 units minimum, below the 50% order trigger — no order proposed. Lower the trigger to build up to the minimum.',
+      }),
+    ]);
   });
 
-  it('min 60 units: fill one pack at a time by lowest days of cover → C, B, C', () => {
-    const { s, lines } = setup({ kind: 'units', amount: 60 });
-    const out = applyVendorMinimums(s, lines);
-    expect(qtys(out.lines)).toEqual({ a: ['must', 30], b: ['vendor-min-fill', 10], c: ['vendor-min-fill', 20] });
-    expect(out.lines.find((l) => l.proposal.itemId === 'c')!.proposal.cost).toBe(40);
+  it('trigger 30%: builds one pack at a time to the lowest days of cover, re-ranked after each pack', () => {
+    // Days of cover before each pack (a, b, c):     pick  total
+    //   4.0  5.0  4.5                                a     40
+    //   5.0  5.0  4.5                                c     50
+    //   5.0  5.0  5.5   (tie → itemId)               a     60
+    //   6.0  5.0  5.5                                b     70
+    //   6.0  6.0  5.5                                c     80
+    //   6.0  6.0  6.5   (tie → itemId)               a     90
+    //   7.0  6.0  6.5                                b    100 ✓   d (19 days) never picked
+    const out = run({ kind: 'units', amount: 100 }, 0.3);
+    expect(table(out.proposals)).toEqual([
+      ['a', 'must', 60],
+      ['b', 'vendor-min-fill', 20],
+      ['c', 'vendor-min-fill', 20],
+    ]);
+    expect(out.proposals.map((p) => p.cost)).toEqual([120, 40, 40]);
     expect(out.exceptions).toEqual([]);
-    expect(lines[2].proposal.qty).toBe(0); // input not mutated
   });
 
-  it('min 100 units: can items stop at COP; 80 < 100 → shortfall flagged', () => {
-    const { s, lines } = setup({ kind: 'units', amount: 100 });
-    const out = applyVendorMinimums(s, lines);
-    // B fills to 70 (= COP); C to 75 (was 65 < 70 before its last pack).
-    expect(qtys(out.lines)).toEqual({ a: ['must', 30], b: ['vendor-min-fill', 20], c: ['vendor-min-fill', 30] });
-    expect(out.exceptions).toHaveLength(1);
-    expect(out.exceptions[0]).toMatchObject({ kind: 'vendor-min-shortfall', vendorId: 'v', depotId: 'camp' });
+  it('the build sequence itself', () => {
+    const { lines } = setup({ kind: 'units', amount: 100 });
+    const cands: BuildCandidate[] = lines.map((l) => ({
+      itemId: l.proposal.itemId,
+      qty: l.proposal.reason === 'must' ? l.proposal.qty : 0,
+      packSize: 10,
+      unitCost: 2,
+      projectedAtD2: l.proposal.projectedAtD2,
+      avgDailyForecast: l.avgDailyForecast,
+      criticality: 3,
+      must: l.proposal.reason === 'must',
+    }));
+    const res = buildToMinimum(cands, { kind: 'units', amount: 100 }, 0.3);
+    expect(res).toMatchObject({ outcome: 'built', needRatio: 0.3 });
+    expect(res.steps).toEqual(['a', 'c', 'a', 'b', 'c', 'a', 'b']);
   });
 
-  it('value minimum: 80 silver = A (60) + one pack of C (20)', () => {
-    const { s, lines } = setup({ kind: 'value', amount: 80 });
-    expect(qtys(applyVendorMinimums(s, lines).lines)).toEqual({ a: ['must', 30], b: ['can', 0], c: ['vendor-min-fill', 10] });
+  it('trigger exactly equal to the need ratio builds', () => {
+    expect(run({ kind: 'units', amount: 100 }, 0.3).proposals).toHaveLength(3);
+    expect(run({ kind: 'units', amount: 100 }, 0.31).proposals).toEqual([]);
   });
 
-  it("criticality ranking fills the most critical item first", () => {
-    const r: Rules = { ...rules, vendorMinFillPriority: 'criticality' };
-    const { s, lines } = setup(
-      { kind: 'units', amount: 40 },
-      { items: { a: item('a'), b: item('b', { criticality: 5 }), c: item('c') } },
-    );
-    expect(qtys(applyVendorMinimums(s, lines, r).lines).b).toEqual(['vendor-min-fill', 10]);
+  it('value minimum: need 60 of 160 silver = 37.5%; build a, c, a, b, c → 160', () => {
+    const out = run({ kind: 'value', amount: 160 }, 0.3);
+    expect(table(out.proposals)).toEqual([
+      ['a', 'must', 50],
+      ['b', 'vendor-min-fill', 10],
+      ['c', 'vendor-min-fill', 20],
+    ]);
   });
 
-  it('no top-up when nothing must be ordered from the vendor', () => {
-    const { s } = setup({ kind: 'units', amount: 60 });
+  it("buildPriority 'criticality': the most critical item takes the first pack", () => {
+    const r: Rules = { ...rules, vendorMin: { ...rules.vendorMin, buildPriority: 'criticality' } };
+    const out = run({ kind: 'units', amount: 40 }, 0.3, r, {
+      items: { a: item('a'), b: item('b'), c: item('c'), d: item('d', { criticality: 5 }) },
+    });
+    expect(table(out.proposals)).toEqual([
+      ['a', 'must', 30],
+      ['d', 'vendor-min-fill', 10],
+    ]);
+  });
+
+  it('must lines alone meet the minimum → unchanged', () => {
+    expect(table(run({ kind: 'units', amount: 30 }, 0.5).proposals)).toEqual([['a', 'must', 30]]);
+  });
+
+  it('no must need → no order and no exception', () => {
+    const { s } = setup({ kind: 'units', amount: 100 });
     const s2 = { ...s, locations: s.locations.filter((l) => l.itemId !== 'a') };
-    const out = applyVendorMinimums(s2, generatePlanLines(s2));
-    expect(out.lines.every((l) => l.proposal.qty === 0)).toBe(true);
-    expect(out.exceptions).toEqual([]);
+    expect(applyVendorMinimums(s2, generatePlanLines(s2), () => 0)).toEqual({ proposals: [], exceptions: [] });
+  });
+
+  it('vendor without a minimum: must lines only', () => {
+    expect(table(run(undefined, 0.5).proposals)).toEqual([['a', 'must', 30]]);
+  });
+
+  it('candidates without forecast cannot absorb packs → built-short', () => {
+    const c = (itemId: string, must: boolean, avg: number): BuildCandidate => ({
+      itemId,
+      qty: must ? 10 : 0,
+      packSize: 10,
+      unitCost: 1,
+      projectedAtD2: 0,
+      avgDailyForecast: avg,
+      criticality: 1,
+      must,
+    });
+    expect(buildToMinimum([c('x', true, 0), c('y', false, 0)], { kind: 'units', amount: 50 }, 0).outcome).toBe('built-short');
   });
 });

@@ -30,10 +30,10 @@ describe('proposals exposed by refresh', () => {
     expect(refresh(threeItems(0), q).proposals.map((p) => [p.itemId, p.reason, p.qty])).toEqual([['a', 'must', 30]]);
   });
 
-  it('can items pulled in for a vendor minimum appear with qty > 0', () => {
-    // Min 40: one pack of c (lowest days of cover) closes the gap; b stays unproposed.
-    expect(refresh(threeItems(40), q).proposals.map((p) => [p.itemId, p.reason, p.qty])).toEqual([
-      ['a', 'must', 30],
+  it('items pulled in for a vendor minimum appear with qty > 0', () => {
+    // Min 50, need 30 (60% ≥ 50% trigger): a (4.0 days) +10, then c (4.5) +10; b stays out.
+    expect(refresh(threeItems(50), q).proposals.map((p) => [p.itemId, p.reason, p.qty])).toEqual([
+      ['a', 'must', 40],
       ['c', 'vendor-min-fill', 10],
     ]);
   });

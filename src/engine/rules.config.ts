@@ -29,8 +29,20 @@ export interface Rules {
     | { method: 'exp-smoothing'; alpha: number; initWindow: number };
   /** How battle-plan uplift combines with baseline. */
   eventBlend: 'multiply' | 'add';
-  /** Vendor-minimum fill: rank candidates below COP by this. */
-  vendorMinFillPriority: 'days-of-cover' | 'criticality';
+  /**
+   * Vendor minimums (§4 CO-MRP, §6). If the must-order need (pack-rounded, in the minimum's
+   * units or value) ÷ the minimum ≥ the order trigger, the order is BUILT up to the minimum one
+   * pack at a time, each pack going to the item with the greatest need (re-evaluated after
+   * every pack); below the trigger no order is proposed for that vendor.
+   */
+  vendorMin: {
+    /** Trigger used when the vendor/player has not set one (0–1 of the minimum). */
+    defaultOrderTrigger: number;
+    /** Greatest need = lowest projected days of cover at D2, or highest criticality first. */
+    buildPriority: 'days-of-cover' | 'criticality';
+    /** Safety valve on the build loop. */
+    maxPacks: number;
+  };
   budget: {
     /** Fraction of allowance over which penalties start. */
     overspendTolerance: number;
@@ -108,7 +120,7 @@ export const rules: Rules = {
   packRounding: { mode: 'up' },
   forecast: { method: 'exp-smoothing', alpha: 0.2, initWindow: 7 },
   eventBlend: 'multiply',
-  vendorMinFillPriority: 'days-of-cover',
+  vendorMin: { defaultOrderTrigger: 0.5, buildPriority: 'days-of-cover', maxPacks: 10000 },
   budget: { overspendTolerance: 0, overspendCarryPenalty: 1, moralePerOverspendPct: 0.5 },
   morale: { perUnitStockoutByCriticality: 0.05, dailyRecovery: 0.5 },
   projection: { measureAtD2: 'before-d2-receipt', lostSales: true },

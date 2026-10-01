@@ -71,10 +71,14 @@ function earliestDelivery(state: GameState, loc: ItemLocation): Day | undefined 
 
 /** Recompute proposals and planning exceptions for today. No time passes; no RNG used. */
 export function refresh(state: GameState, r: Rules = defaultRules): GameState {
-  const { lines, exceptions: minExceptions } = applyVendorMinimums(state, generatePlanLines(state, r), r);
-  // Unfilled 'can' lines (qty 0) are planning detail, not proposals: a can item only
-  // appears once pulled in to meet a vendor minimum (reason 'vendor-min-fill').
-  const proposals = lines.map((l) => l.proposal).filter((p) => p.qty > 0);
+  // Only lines with qty > 0: a non-must item appears only when the build pulls it in to
+  // meet a vendor minimum (reason 'vendor-min-fill').
+  const { proposals, exceptions: minExceptions } = applyVendorMinimums(
+    state,
+    generatePlanLines(state, r),
+    () => r.vendorMin.defaultOrderTrigger,
+    r,
+  );
   const exceptions: PlanningException[] = state.exceptions.filter((e) => EVENT_KINDS.has(e.kind));
 
   for (const p of proposals) {
@@ -125,8 +129,8 @@ export function refresh(state: GameState, r: Rules = defaultRules): GameState {
 /**
  * Turn accepted decisions into open orders placed today. Edited qty is rounded to the pack
  * size and cost recomputed; spend is committed to the current fiscal period. Rejected and
- * deferred lines are dropped. A vendor order below the vendor minimum takes the surcharge
- * or is dropped (see applyMinimumSurcharges). Proposals/exceptions are then refreshed
+ * deferred lines are dropped. Vendor minimums are enforced when proposals are built (CO-MRP);
+ * an accepted line is placed as decided. Proposals/exceptions are then refreshed
  * (accepted lines are now covered by open orders).
  */
 export function placeOrders(state: GameState, decisions: ProposalDecisionInput[], r: Rules = defaultRules): GameState {
@@ -152,43 +156,13 @@ export function placeOrders(state: GameState, decisions: ProposalDecisionInput[]
       cost: qty * source.unitCost,
     });
   }
-  const placed = applyMinimumSurcharges(state, newOrders);
+  const placed = newOrders;
   if (placed.length === 0) return state;
 
   const spend = placed.reduce((s, o) => s + o.cost, 0);
   const period = periodFor(state.periods, state.today);
   const periods = state.periods.map((p) => (p === period ? { ...p, committed: p.committed + spend } : p));
   return refresh({ ...state, openOrders: [...state.openOrders, ...placed], periods }, r);
-}
-
-/**
- * Vendor minimums at acceptance (RELEX_RULES §6), per (vendor, depot) order placed today.
- * A short order is accepted with the vendor's surcharge — set once, as `surcharge` on the
- * order's first line and included in its cost — or dropped if the vendor defines no
- * surcharge. If lines for that vendor/depot were already placed today, the order already
- * passed this check.
- */
-function applyMinimumSurcharges(state: GameState, newOrders: OpenOrder[]): OpenOrder[] {
-  const groups = new Map<string, OpenOrder[]>();
-  for (const o of newOrders) {
-    const key = `${o.vendorId}\u0000${o.depotId}`;
-    groups.set(key, [...(groups.get(key) ?? []), o]);
-  }
-  const out: OpenOrder[] = [];
-  for (const group of groups.values()) {
-    const { vendorId, depotId } = group[0];
-    const min = state.vendors[vendorId]?.minimum;
-    const alreadyPlaced = state.openOrders.some(
-      (o) => o.orderedOn === state.today && o.vendorId === vendorId && o.depotId === depotId,
-    );
-    const total = group.reduce((s, o) => s + (min?.kind === 'value' ? o.cost : o.qty), 0);
-    if (!min || alreadyPlaced || total >= min.amount) {
-      out.push(...group);
-    } else if (min.surcharge !== undefined) {
-      out.push({ ...group[0], cost: group[0].cost + min.surcharge, surcharge: min.surcharge }, ...group.slice(1));
-    }
-  }
-  return out;
 }
 
 /**

@@ -20,14 +20,16 @@ describe('selectDecisionPreview', () => {
     expect(preview.dropped).toEqual([]);
   });
 
-  it('includes the surcharge for a below-minimum order', () => {
+  // TODO(lead): surcharge path removed by owner spec (RELEX_RULES §4/§6, CO-MRP order trigger).
+  it.skip('includes the surcharge for a below-minimum order', () => {
     const game = engine.initGame(withMinimum({ kind: 'units', amount: 10_000, surcharge: 7 }));
     const preview = selectDecisionPreview(game, { 0: { decision: 'accepted' } });
     expect(preview.surcharges).toBe(7);
     expect(preview.spend).toBe(game.proposals[0].cost + 7);
   });
 
-  it('reports a below-minimum order with no surcharge as dropped', () => {
+  // TODO(lead): surcharge path removed by owner spec (RELEX_RULES §4/§6, CO-MRP order trigger).
+  it.skip('reports a below-minimum order with no surcharge as dropped', () => {
     const game = engine.initGame(withMinimum({ kind: 'units', amount: 10_000 }));
     const preview = selectDecisionPreview(game, { 0: { decision: 'accepted' } });
     expect(preview.orders).toEqual([]);

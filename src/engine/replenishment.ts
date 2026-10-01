@@ -144,18 +144,18 @@ export interface PlanLine {
   unitCost: number;
 }
 
-/** Proposal for a planning detail ordering today; undefined if projected stock is at/above COP. */
-export function planLine(p: PlanningDetail, r: Rules = defaultRules): PlanLine | undefined {
-  let reason: OrderProposal['reason'];
+/**
+ * Plan line for a planning detail ordering today. Below MOP → 'must' with the pack-rounded
+ * quantity to reach order-up-to; otherwise 'can' with qty 0 (a candidate for building up to
+ * a vendor minimum, whether or not it is below COP).
+ */
+export function planLine(p: PlanningDetail, r: Rules = defaultRules): PlanLine {
+  let reason: OrderProposal['reason'] = 'can';
   let qty = 0;
   if (p.projectedAtD2 < p.mustOrderPoint) {
     reason = 'must';
     qty = roundToPack(p.orderUpTo - p.projectedAtD2, p.rule.packSize, r);
     if (qty === 0 && r.mustOrderMinOnePack) qty = Math.max(1, p.rule.packSize);
-  } else if (p.projectedAtD2 < p.canOrderPoint) {
-    reason = 'can';
-  } else {
-    return undefined;
   }
   return {
     proposal: {
@@ -178,23 +178,24 @@ export function planLine(p: PlanningDetail, r: Rules = defaultRules): PlanLine |
 }
 
 /**
- * Raw proposals for today, before vendor-minimum fill: one line per item-location whose
- * next order opportunity is today and whose projection at D2 is below COP. `must` lines carry a qty;
- * `can` lines have qty 0 (candidates for vendor-minimum fill).
+ * One plan line per item-location whose next order opportunity is today, before vendor
+ * minimums: `must` lines carry a qty, all others are qty-0 `can` lines.
  */
 export function generatePlanLines(state: GameState, r: Rules = defaultRules): PlanLine[] {
   const lines: PlanLine[] = [];
   for (const loc of state.locations) {
     const detail = planningDetail(state, loc, r);
-    if (!detail || detail.orderDay !== state.today) continue;
-    const line = planLine(detail, r);
-    if (line) lines.push(line);
+    if (detail && detail.orderDay === state.today) lines.push(planLine(detail, r));
   }
   return lines;
 }
 
-/** Raw plan lines as proposals, including unfilled `can` lines (qty 0). Engine-internal; the
- *  player-facing list is GameState.proposals from refresh(), which drops qty-0 lines. */
+/**
+ * Raw must/can lines (can = between MOP and COP, qty 0). Engine-internal, for tests and
+ * diagnostics; the player-facing list is GameState.proposals from refresh().
+ */
 export function generateProposals(state: GameState, r: Rules = defaultRules): OrderProposal[] {
-  return generatePlanLines(state, r).map((l) => l.proposal);
+  return generatePlanLines(state, r)
+    .map((l) => l.proposal)
+    .filter((p) => p.reason === 'must' || p.projectedAtD2 < p.canOrderPoint);
 }

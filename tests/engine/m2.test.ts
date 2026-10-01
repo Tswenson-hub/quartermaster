@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { addLot, consume, expire, lotsOf } from '../../src/engine/lots';
 import { placeOrders, refresh, tick } from '../../src/engine/tick';
 import type { GameState, OpenOrder, Vendor } from '../../src/engine/types';
-import { item, loc, quietRules as q, source, state, vendor } from './fixtures';
+import { item, loc, quietRules as q, state, vendor } from './fixtures';
 
 const order = (extra: Partial<OpenOrder>): OpenOrder => ({
   id: 'o',
@@ -108,47 +108,13 @@ describe('tick: late deliveries', () => {
   });
 });
 
-describe('placeOrders: vendor-minimum surcharge', () => {
-  // One must line: 30 units @ 2 silver; no can items to top up.
-  const short = (minimum: Vendor['minimum']) =>
-    refresh(state({ locations: [loc('grain', { onHand: 70 })], vendors: { v: vendor('v', { minimum }) } }), q);
-  const acceptAll = (s: GameState) => placeOrders(s, s.proposals.map((_, index) => ({ index, decision: 'accepted' as const })), q);
-
-  it('short order with a surcharge: accepted, surcharge added once to the cost', () => {
-    const s0 = short({ kind: 'units', amount: 100, surcharge: 15 });
-    expect(s0.exceptions).toContainEqual(expect.objectContaining({ kind: 'vendor-min-shortfall' }));
-    const s = acceptAll(s0);
-    expect(s.openOrders).toEqual([expect.objectContaining({ qty: 30, cost: 75, surcharge: 15 })]);
-    expect(s.periods[0].committed).toBe(75);
-  });
-
-  it('short order without a surcharge is dropped', () => {
-    const s0 = short({ kind: 'units', amount: 100 });
-    expect(acceptAll(s0)).toBe(s0);
-  });
-
-  it('minimum met: no surcharge; value minimums use cost', () => {
-    const met = acceptAll(short({ kind: 'value', amount: 60, surcharge: 15 })).openOrders[0];
-    expect(met.cost).toBe(60);
-    expect(met.surcharge).toBeUndefined();
-  });
-
-  it('surcharge applies once per vendor order per day, across lines and calls', () => {
-    const s0 = refresh(
-      state({
-        items: { grain: item('grain'), salt: item('salt') },
-        vendors: { v: vendor('v', { minimum: { kind: 'units', amount: 100, surcharge: 15 } }) },
-        sourcing: [source('grain'), source('salt')],
-        locations: [loc('grain', { onHand: 70 }), loc('salt', { onHand: 70 })],
-      }),
-      q,
-    );
-    const first = placeOrders(s0, [{ index: 0, decision: 'accepted' }], q);
-    expect(first.openOrders.map((o) => o.cost)).toEqual([75]);
-    const salt = first.proposals.findIndex((p) => p.itemId === 'salt');
-    const second = placeOrders(first, [{ index: salt, decision: 'accepted' }], q);
-    expect(second.openOrders.map((o) => o.cost)).toEqual([75, 60]);
-    expect(second.openOrders.map((o) => o.surcharge)).toEqual([15, undefined]);
-    expect(second.periods[0].committed).toBe(135);
+describe('placeOrders after CO-MRP', () => {
+  it('accepted lines are placed as decided — no surcharge path', () => {
+    const s0 = refresh(state({ locations: [loc('grain', { onHand: 70 })], vendors: { v: vendor('v', { minimum: { kind: 'units', amount: 40 } }) } }), q);
+    // Need 30 of 40 = 75% ≥ 50% default trigger → built to 40.
+    expect(s0.proposals.map((p) => [p.reason, p.qty])).toEqual([['must', 40]]);
+    const s = placeOrders(s0, [{ index: 0, decision: 'accepted', qty: 20 }], q);
+    expect(s.openOrders).toEqual([expect.objectContaining({ qty: 20, cost: 40 })]);
+    expect(s.openOrders[0].surcharge).toBeUndefined();
   });
 });
