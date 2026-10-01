@@ -125,6 +125,10 @@ export interface VendorGroup {
   /** Accepted + undecided lines. */
   openValue: number;
   openUnits: number;
+  /** Accepted lines fall short of the vendor minimum (and something is accepted). */
+  belowMinimum: boolean;
+  /** Surcharge the vendor charges for sending a short order; undefined = short orders not allowed. */
+  surcharge?: number;
 }
 
 function sourcingFor(sourcing: SourcingRule[], p: OrderProposal) {
@@ -139,7 +143,7 @@ export function useVendorGroups(): VendorGroup[] {
     if (!game) return [];
     const byVendor = new Map<string, VendorGroup>();
     for (const v of Object.values(game.vendors)) {
-      byVendor.set(v.id, { vendor: v, lines: [], acceptedValue: 0, acceptedUnits: 0, openValue: 0, openUnits: 0 });
+      byVendor.set(v.id, { vendor: v, lines: [], acceptedValue: 0, acceptedUnits: 0, openValue: 0, openUnits: 0, belowMinimum: false });
     }
     game.proposals.forEach((p, index) => {
       const g = byVendor.get(p.vendorId);
@@ -168,6 +172,12 @@ export function useVendorGroups(): VendorGroup[] {
         g.openUnits += qty;
       }
     });
+    for (const g of byVendor.values()) {
+      const min = g.vendor.minimum;
+      const accepted = min?.kind === 'value' ? g.acceptedValue : g.acceptedUnits;
+      g.belowMinimum = !!min && accepted > 0 && accepted < min.amount;
+      g.surcharge = min?.surcharge;
+    }
     return [...byVendor.values()].sort((a, b) => b.lines.length - a.lines.length);
   }, [game, decisions, drafts]);
 }
@@ -177,7 +187,7 @@ export function useVendorGroups(): VendorGroup[] {
 export interface TreasuryView {
   period: FiscalPeriod | undefined;
   periods: FiscalPeriod[];
-  /** Value of lines accepted today, committed when the day ends. */
+  /** Value of lines accepted today (incl. any vendor-minimum surcharges), committed when the day ends. */
   pendingToday: number;
   remaining: number;
 }
@@ -188,7 +198,7 @@ export function useTreasury(): TreasuryView | null {
   return useMemo(() => {
     if (!game) return null;
     const period = selectCurrentPeriod(game);
-    const pendingToday = groups.reduce((a, g) => a + g.acceptedValue, 0);
+    const pendingToday = groups.reduce((a, g) => a + g.acceptedValue + (g.belowMinimum ? (g.surcharge ?? 0) : 0), 0);
     const remaining = period ? period.allowance - period.committed - pendingToday : 0;
     return { period, periods: game.periods, pendingToday, remaining };
   }, [game, groups]);

@@ -94,9 +94,17 @@ function VendorCard({ group, game }: { group: VendorGroup; game: GameState }) {
       {min && (
         <div className={`vendor-min ${met ? 'met' : 'short'}`}>
           <div className="vendor-min-label">
-            <Term k="vendorMin">Vendor minimum</Term>: {fmt(min.amount)} —{' '}
+            <Term k="vendorMin">Vendor minimum</Term>: {fmt(min.amount)}
+            {min.surcharge !== undefined && <span className="muted"> (or {fmtSilver(min.surcharge)} surcharge)</span>} —{' '}
             {met ? <strong>met ✓</strong> : <strong>short by {fmt(min.amount - accepted)}</strong>}
           </div>
+          {group.belowMinimum && (
+            <p className="vendor-min-warn">
+              {group.surcharge !== undefined
+                ? `Sent as it stands, ${vendor.name} adds a surcharge of ${fmtSilver(group.surcharge)}.`
+                : `${vendor.name} will not ride for so small an order — accept more, or reject these lines.`}
+            </p>
+          )}
           <Meter
             max={Math.max(min.amount * 1.25, open)}
             marker={{ value: min.amount, label: `Minimum ${fmt(min.amount)}` }}
@@ -164,7 +172,7 @@ function ProposalRow({ line, game }: { line: ProposalLine; game: GameState }) {
 
   return (
     <tr data-testid="proposal-row" className={`row-${decision ?? 'open'}`}>
-      <td>
+      <td className="cell-item">
         <button type="button" className="item-cell link" onClick={() => planItem(p.itemId, p.depotId)} title="Open in Item Planning">
           <ItemIcon item={item} size={26} />
           <span>
@@ -173,17 +181,17 @@ function ProposalRow({ line, game }: { line: ProposalLine; game: GameState }) {
           </span>
         </button>
       </td>
-      <td>
+      <td data-label="Why">
         <span className={`pill ${reason.cls}`}>{reason.term ? <Term k={reason.term}>{reason.label}</Term> : reason.label}</span>
       </td>
-      <td className={`num ${below ? 'bad-text' : ''}`}>{fmtQty(p.projectedAtD2)}</td>
-      <td className="num">
+      <td data-label="Proj. at D2" className={`num ${below ? 'bad-text' : ''}`}>{fmtQty(p.projectedAtD2)}</td>
+      <td data-label="MOP / COP" className="num">
         {fmtQty(p.mustOrderPoint)} / {fmtQty(p.canOrderPoint)}
       </td>
-      <td className="nowrap">
+      <td data-label="D1 → D2" className="nowrap">
         {fmtDay(p.d1)} → {fmtDay(p.d2)}
       </td>
-      <td className="num">
+      <td data-label="Qty" className="num">
         <div className="qty-editor">
           <button type="button" className="btn btn-tiny" aria-label="Fewer" disabled={decision === 'rejected' || qty <= 0} onClick={() => changeQty(qty - packSize)}>
             −
@@ -204,8 +212,8 @@ function ProposalRow({ line, game }: { line: ProposalLine; game: GameState }) {
         </div>
         <div className="muted small">×{packSize}{line.edited && <> · was {fmtQty(p.qty)}</>}</div>
       </td>
-      <td className="num">{fmtSilver(line.cost)}</td>
-      <td>
+      <td data-label="Cost" className="num">{fmtSilver(line.cost)}</td>
+      <td data-label="Decision">
         <div className="decision-btns">
           <button
             type="button"

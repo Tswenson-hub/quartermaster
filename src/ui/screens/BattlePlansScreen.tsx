@@ -83,7 +83,7 @@ function Letter({ plan, game }: { plan: BattlePlan; game: GameState }) {
           return (
             <li key={itemId}>
               <ItemIcon item={item} size={22} />
-              <span>{item?.name ?? itemId}</span>
+              <span className="uplift-name">{item?.name ?? itemId}</span>
               <strong>×{f}</strong>
               {depot && (
                 <button type="button" className="link small" onClick={() => planItem(itemId, depot)}>

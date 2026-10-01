@@ -94,7 +94,10 @@ export function TreasuryScreen() {
                         <span className="muted"> · {game.vendors[o.vendorId]?.name}</span>
                       </td>
                       <td className="num">{fmtQty(o.qty)}</td>
-                      <td className="num">{fmtSilver(o.cost)}</td>
+                      <td className="num">
+                        {fmtSilver(o.cost)}
+                        {!!o.surcharge && <div className="muted small">incl. {fmtSilver(o.surcharge)} surcharge</div>}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
