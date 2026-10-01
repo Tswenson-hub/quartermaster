@@ -6,19 +6,21 @@ import type { Day, DepotId, GameState, ItemId, ItemLocation } from './types';
 
 /**
  * End-of-day projected stock for each day of `forecastTotals` (index 0 = first day).
- * `receipts[i]` arrives on day i before that day's demand. With lostSales, stock clamps at 0.
+ * `receipts[i]` arrives on day i before that day's demand. With lostSales, stock clamps at 0
+ * on the first `clampDays` days (default: all); later days may go negative.
  */
 export function projectStock(
   onHand: number,
   forecastTotals: readonly number[],
   receipts: readonly number[],
   lostSales: boolean,
+  clampDays = forecastTotals.length,
 ): number[] {
   const out: number[] = [];
   let stock = onHand;
   for (let i = 0; i < forecastTotals.length; i++) {
     stock = stock + (receipts[i] ?? 0) - forecastTotals[i];
-    if (lostSales) stock = Math.max(0, stock);
+    if (lostSales && i < clampDays) stock = Math.max(0, stock);
     out.push(stock);
   }
   return out;

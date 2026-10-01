@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateProposals, planningParams, roundToPack } from '../../src/engine/replenishment';
 import { rules, zScore, type Rules } from '../../src/engine/rules.config';
-import { loc, source, state, vendor } from './fixtures';
+import { flat, loc, source, state, vendor } from './fixtures';
 
 // Golden setup (see fixtures): forecast 10/day, LT 3, order days Mon/Thu, MOP = 40, COP = 70.
 
@@ -153,5 +153,23 @@ describe('pack rounding', () => {
     const s = state({ locations: [loc('grain', { onHand: 97 })], sourcing: [source('grain', 'v', { packSize: 12 })] });
     // proj 37, need 3 → 0.25 pack → 0 → bumped to 12
     expect(generateProposals(s, r)[0]).toMatchObject({ reason: 'must', qty: 12 });
+  });
+});
+
+describe('golden: deficit before D2 (lost sales must not hide demand D1..D2)', () => {
+  // On hand 20, 20/day, MOP 16 (presentation). Mon order: D1 = 3, D2 = 6.
+  // Days 0–2 clamp at 0 (sales before D1 are lost either way); days 3–5 need 60 more.
+  const s = state({
+    locations: [loc('grain', { onHand: 20, history: flat(20), presentationStock: 16 })],
+  });
+
+  it('projectedAtD2 = −60 and qty = MOP − (−60) = 76', () => {
+    expect(generateProposals(s)[0]).toMatchObject({ d1: 3, d2: 6, projectedAtD2: -60, mustOrderPoint: 16, reason: 'must', qty: 76 });
+  });
+
+  it('with the order arriving at D1, stock at end of D2−1 is exactly MOP', () => {
+    const qty = generateProposals(s)[0].qty;
+    // Arrives day 3 on an empty camp; days 3, 4, 5 consume 60.
+    expect(qty - 3 * 20).toBe(16);
   });
 });

@@ -62,7 +62,8 @@ export interface PlanningDetail extends PlanningParams {
 
 /**
  * MOP/COP/order-up-to and projection at D2 for an order placed with `vendor` on `orderDay`
- * (≥ today). The projection runs from today and includes all open orders, but not this order.
+ * (≥ today). The projection runs from today and includes all open orders, but not this order;
+ * it may be negative (see below), unlike the displayed projection.
  */
 export function computePlanning(
   state: GameState,
@@ -76,7 +77,15 @@ export function computePlanning(
   const measureDay = r.projection.measureAtD2 === 'before-d2-receipt' ? d2 - 1 : d2;
 
   const totals = forecastLocation(state, loc, state.today, measureDay, r).map((p) => p.total);
-  const proj = projectStock(loc.onHand, totals, receiptsByDay(state, loc, measureDay), r.projection.lostSales);
+  // Lost sales are clamped only before D1: demand from D1 on is this order's to cover, so the
+  // projection there runs unclamped and a negative projectedAtD2 is the deficit to fill.
+  const proj = projectStock(
+    loc.onHand,
+    totals,
+    receiptsByDay(state, loc, measureDay),
+    r.projection.lostSales,
+    d1 - state.today,
+  );
   const projectedAtD2 = proj[proj.length - 1];
   const window = totals.slice(orderDay - state.today);
   const avgDailyForecast = window.reduce((a, b) => a + b, 0) / window.length;
