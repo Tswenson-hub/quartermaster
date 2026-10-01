@@ -118,7 +118,7 @@ describe('placeOrders: vendor-minimum surcharge', () => {
     const s0 = short({ kind: 'units', amount: 100, surcharge: 15 });
     expect(s0.exceptions).toContainEqual(expect.objectContaining({ kind: 'vendor-min-shortfall' }));
     const s = acceptAll(s0);
-    expect(s.openOrders).toEqual([expect.objectContaining({ qty: 30, cost: 75 })]);
+    expect(s.openOrders).toEqual([expect.objectContaining({ qty: 30, cost: 75, surcharge: 15 })]);
     expect(s.periods[0].committed).toBe(75);
   });
 
@@ -128,7 +128,9 @@ describe('placeOrders: vendor-minimum surcharge', () => {
   });
 
   it('minimum met: no surcharge; value minimums use cost', () => {
-    expect(acceptAll(short({ kind: 'value', amount: 60, surcharge: 15 })).openOrders[0].cost).toBe(60);
+    const met = acceptAll(short({ kind: 'value', amount: 60, surcharge: 15 })).openOrders[0];
+    expect(met.cost).toBe(60);
+    expect(met.surcharge).toBeUndefined();
   });
 
   it('surcharge applies once per vendor order per day, across lines and calls', () => {
@@ -146,6 +148,7 @@ describe('placeOrders: vendor-minimum surcharge', () => {
     const salt = first.proposals.findIndex((p) => p.itemId === 'salt');
     const second = placeOrders(first, [{ index: salt, decision: 'accepted' }], q);
     expect(second.openOrders.map((o) => o.cost)).toEqual([75, 60]);
+    expect(second.openOrders.map((o) => o.surcharge)).toEqual([15, undefined]);
     expect(second.periods[0].committed).toBe(135);
   });
 });
