@@ -154,6 +154,12 @@ export interface OrderProposal {
   d1: Day;
   /** Delivery date of the next order opportunity — the coverage horizon. */
   d2: Day;
+  /**
+   * Projected stock at the D2 check point (end of D2 − 1 by default; see rules.projection.measureAtD2),
+   * with this order NOT yet placed. Lost sales clamp stock at 0 only up to D1; after that it may go
+   * negative, so a negative value = demand that would go unmet before the next delivery. This is
+   * what order sizing uses. engine.project() is the physical stock and never goes below 0.
+   */
   projectedAtD2: number;
   mustOrderPoint: number;
   canOrderPoint: number;
@@ -263,6 +269,12 @@ export interface PlanningParams {
   mustOrderPoint: number;
   canOrderPoint: number;
   orderUpTo: number;
+  /**
+   * Projected stock at the D2 check point (end of D2 − 1 by default; see rules.projection.measureAtD2),
+   * with this order NOT yet placed. Lost sales clamp stock at 0 only up to D1; after that it may go
+   * negative, so a negative value = demand that would go unmet before the next delivery. This is
+   * what order sizing uses. engine.project() is the physical stock and never goes below 0.
+   */
   projectedAtD2: number;
 }
 

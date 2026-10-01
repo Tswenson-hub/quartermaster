@@ -11,6 +11,7 @@ import type {
   ProposalDecisionInput,
 } from '../engine/types';
 import type { DecisionEntry } from './gameStore';
+import { rules } from '../engine/rules.config';
 import { engine } from './engine';
 
 export function selectForecast(game: GameState, itemId: ItemId, depotId: DepotId, from: Day, to: Day): ForecastPoint[] {
@@ -20,6 +21,11 @@ export function selectForecast(game: GameState, itemId: ItemId, depotId: DepotId
 /** MOP/COP/D1/D2 at the next order opportunity, for drawing reference lines on days with no proposal. */
 export function selectPlanningParams(game: GameState, itemId: ItemId, depotId: DepotId): PlanningParams | undefined {
   return engine.planningParams(game, itemId, depotId);
+}
+
+/** Day whose end-of-day projection is compared to the MOP: d2 − 1 or d2, per rules.projection.measureAtD2. */
+export function selectD2CheckDay(params: Pick<PlanningParams, 'd2'>): Day {
+  return rules.projection.measureAtD2 === 'before-d2-receipt' ? params.d2 - 1 : params.d2;
 }
 
 /** Projected end-of-day stock, index 0 = `from`. `from` must be ≥ game.today. */
