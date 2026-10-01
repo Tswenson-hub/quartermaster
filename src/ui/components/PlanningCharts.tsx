@@ -21,6 +21,7 @@ const INK = '#3b2a1a';
 const MUTED = '#7a6648';
 const MOP = '#a8202a';
 const COP = '#8a6a12';
+const USER_FC = '#d9a441';
 
 const axisProps = {
   stroke: MUTED,
@@ -53,7 +54,7 @@ interface Props {
 }
 
 export function PlanningCharts({ view, unit, battlePlans }: Props) {
-  const { points, params, today, d2CheckDay } = view;
+  const { points, params, today, d2CheckDay, overrides } = view;
   const first = points[0]?.day ?? 0;
   const last = points[points.length - 1]?.day ?? 0;
   const domain: [number, number] = [first, last];
@@ -123,6 +124,17 @@ export function PlanningCharts({ view, unit, battlePlans }: Props) {
             <YAxis {...axisProps} width={48} />
             <Tooltip content={<TipBox />} cursor={{ stroke: INK, strokeDasharray: '3 3' }} />
             {shade}
+            {overrides.map((o) => (
+              <ReferenceArea
+                key={`${o.from}-${o.to}-${o.mode}`}
+                x1={Math.max(o.from, first) - 0.5}
+                x2={Math.min(o.to, last) + 0.5}
+                fill={USER_FC}
+                fillOpacity={0.18}
+                ifOverflow="hidden"
+                label={o === overrides[0] ? { value: 'your forecast', position: 'insideTop', fill: INK, fontSize: 11 } : undefined}
+              />
+            ))}
             <ReferenceLine x={today} stroke={INK} strokeWidth={2} />
             <Line name="Actual demand" dataKey="history" stroke={SERIES.history} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false} />
             <Line name="Forecast" dataKey="forecast" stroke={SERIES.forecast} strokeWidth={2} strokeDasharray="5 3" dot={false} isAnimationActive={false} />

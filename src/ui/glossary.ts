@@ -23,7 +23,8 @@ export type TermKey =
   | 'exception'
   | 'mustOrder'
   | 'canOrder'
-  | 'vendorMinFill';
+  | 'vendorMinFill'
+  | 'orderTrigger';
 
 export interface GlossaryEntry {
   term: string;
@@ -102,7 +103,7 @@ export const GLOSSARY: Record<TermKey, GlossaryEntry> = {
     term: 'Vendor minimum',
     flavour: 'No smith fires the forge for three nails.',
     plain:
-      'The smallest order a supplier will accept, by value or by units. If you are short, top up items between MOP and COP, or accept the order will not be sent.',
+      'The smallest order a supplier will accept, by value or by units. Whether a small need is built up to the minimum is decided by the order trigger.',
   },
   packSize: {
     term: 'Pack size',
@@ -144,6 +145,12 @@ export const GLOSSARY: Record<TermKey, GlossaryEntry> = {
     term: 'Can order',
     flavour: 'Room in the cart.',
     plain: 'Projected stock at D2 is between MOP and COP. Optional, but cheap to add while a wagon is coming anyway.',
+  },
+  orderTrigger: {
+    term: 'Order trigger',
+    flavour: 'How hungry the camp must be before you send for a full wagon.',
+    plain:
+      'For a supplier with a minimum order: the share of that minimum your real need must reach before the system builds a full order. At or above it, the order is built up to the minimum one pack at a time, always adding the item with the fewest days of cover. Below it, no order is drafted. A lower trigger orders sooner with more padding; a higher trigger waits for a real need.',
   },
   vendorMinFill: {
     term: 'Vendor-minimum fill',
