@@ -72,7 +72,7 @@ export function TitleScreen() {
           ))}
         </ul>
         <p className="credits muted small">
-          Icons: Raven Fantasy Icons by Clockwork Raven Studios · Tiles: Kenney (kenney.nl) · Fonts: Pixelify Sans, IM Fell
+          Icons: Raven Fantasy Icons by Clockwork Raven Studios · Tiles: Kenney (kenney.nl) · Fonts: Inter, IM Fell
           English
         </p>
       </div>

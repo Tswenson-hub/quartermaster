@@ -63,7 +63,7 @@ export function TreasuryScreen() {
                   cursor={{ fill: 'rgba(59,42,26,0.08)' }}
                   formatter={(v) => [fmtSilver(Number(v)), 'Spend']}
                   labelFormatter={(d) => fmtDay(Number(d))}
-                  contentStyle={{ background: '#f6ead0', border: '2px solid #3b2a1a', fontFamily: 'Pixelify Sans' }}
+                  contentStyle={{ background: '#f6ead0', border: '2px solid #3b2a1a', fontFamily: 'Inter, system-ui, sans-serif' }}
                 />
                 <Bar dataKey="spend" fill="#2c62b0" radius={[4, 4, 0, 0]} isAnimationActive={false} />
               </BarChart>
