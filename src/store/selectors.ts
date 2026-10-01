@@ -6,6 +6,7 @@ import type {
   ForecastPoint,
   GameState,
   ItemId,
+  Letter,
   OpenOrder,
   PlanningException,
   PlanningParams,
@@ -14,6 +15,8 @@ import type {
 import type { DecisionEntry } from './gameStore';
 import { kpiSummary, type KpiSummary } from '../engine/kpi';
 import { rules } from '../engine/rules.config';
+import { BATTLES } from '../content/battlePlans';
+import { LETTER_TEMPLATES, rankTitle, type LetterText } from '../content/ranks';
 import { engine } from './engine';
 
 export function selectForecast(game: GameState, itemId: ItemId, depotId: DepotId, from: Day, to: Day): ForecastPoint[] {
@@ -111,4 +114,28 @@ export function selectDifficultyOptions(): DifficultyOption[] {
 export function selectMarketInfo(game: GameState) {
   const { ticker, source, synthetic, firstDate, lastDate } = game.market;
   return { ticker, source, synthetic: !!synthetic, firstDate, lastDate };
+}
+
+/**
+ * Display text for a letter from command: content's LETTER_TEMPLATES filled with the engine's facts.
+ * Falls back to the engine's own text when the letter carries no facts.
+ */
+export function selectLetterText(game: GameState, letter: Letter): LetterText {
+  const f = letter.facts;
+  if (!f) return { from: letter.from, subject: letter.subject, body: letter.body };
+  const plan = letter.battlePlanId ? game.battlePlans.find((b) => b.id === letter.battlePlanId) : undefined;
+  const battle = letter.battlePlanId ? BATTLES[letter.battlePlanId] : undefined;
+  return LETTER_TEMPLATES[letter.kind]({
+    rankTitle: rankTitle(f.rankLevel),
+    period: f.periodIndex === undefined ? undefined : f.periodIndex + 1,
+    committed: f.committed,
+    allowance: f.allowance,
+    reprimands: f.reprimands,
+    reprimandsPerDemotion: rules.rank.reprimandsPerDemotion,
+    merit: f.merit,
+    promotionMerit: rules.rank.promotionMerit,
+    serviceLevel: f.serviceLevel,
+    battleTitle: battle?.name ?? plan?.title,
+    battleLine: letter.kind === 'battle-won' ? battle?.victory : letter.kind === 'battle-lost' ? battle?.defeat : undefined,
+  });
 }

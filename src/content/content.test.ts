@@ -12,9 +12,9 @@ describe('content', () => {
     expect(s.lengthDays).toBe(14);
   });
 
-  it('has 7 tutorial levels plus a sandbox with unique ids', () => {
-    expect(scenarios).toHaveLength(8);
-    expect(new Set(scenarios.map((s) => s.id)).size).toBe(8);
+  it('has 9 tutorial levels plus a sandbox with unique ids', () => {
+    expect(scenarios).toHaveLength(10);
+    expect(new Set(scenarios.map((s) => s.id)).size).toBe(10);
   });
 
   it('sourcing references known items/vendors; split shares sum to 1', () => {

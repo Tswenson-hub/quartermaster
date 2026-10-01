@@ -9,6 +9,8 @@ import type { BattlePlan, BattlePlanId } from '../engine/types';
  * - feast-muster       : exaggerated — the Duke always promises a grander feast than he holds.
  * - winter-crossing    : UNDER-stated — the scouts underestimated the ice.
  * - ford-feint         : accurate.
+ * - levies-arrive      : SILENT — the letter gives no numbers, so the system forecast ignores it.
+ *                        The player must enter a forecast override (tutorial level VIII).
  *
  * Days are campaign days (day 0 = Monday). Each letter arrives with at least the longest
  * relevant vendor lead time to spare, so a sharp quartermaster can pre-build stock.
@@ -76,8 +78,81 @@ export const BATTLE_PLANS: BattlePlan[] = [
     statedUplift: { arrows: 1.8, bolts: 1.8, bowstrings: 1.33 },
     actualUplift: { arrows: 1.85, bolts: 1.7, bowstrings: 1.35 },
   },
+  {
+    id: 'levies-arrive',
+    title: "The Earl's Levies Arrive",
+    letter:
+      'Quartermaster — The Earl of Fennmarch keeps his word at last. His levies march into the ' +
+      'Eastern Camp on the Monday after next and will stay with us until the campaign ends. ' +
+      'They are many, and hungry, and thirsty. I leave the sums to you. — Lord Marshal Edric Vane',
+    announcedOn: 3,
+    start: 14,
+    end: 34,
+    depotIds: ['eastern-camp'],
+    // No figures in the letter, so the system forecast gets no uplift. The player must override it.
+    statedUplift: {},
+    actualUplift: { grain: 1.5, ale: 1.6, bandages: 1.3 },
+  },
 ];
 
 export const BATTLE_PLANS_BY_ID: Record<BattlePlanId, BattlePlan> = Object.fromEntries(
   BATTLE_PLANS.map((p) => [p.id, p]),
 );
+
+/** The battle each plan culminates in. Flavour plus the supply bar to clear (see `winServiceLevel`). */
+export interface Battle {
+  battlePlanId: BattlePlanId;
+  name: string;
+  /** Items whose supply decides the day (shown to the player as the battle's needs). */
+  keyItems: string[];
+  /**
+   * Proposed service level to the plan's depots over its window needed to win. The engine currently
+   * uses one global rules.rank.battleWinServiceLevel; this is content's per-battle proposal.
+   */
+  winServiceLevel: number;
+  victory: string;
+  defeat: string;
+}
+
+export const BATTLES: Record<BattlePlanId, Battle> = {
+  'harrowmere-assault': {
+    battlePlanId: 'harrowmere-assault',
+    name: 'The Storming of Harrowmere',
+    keyItems: ['arrows', 'pitch', 'siege-rope', 'bandages'],
+    winServiceLevel: 0.92,
+    victory: 'The gatehouse burned, the ladders held, and our banner flies over Harrowmere.',
+    defeat: 'The archers ran dry by noon and the ladders came down without rope. Harrowmere stands.',
+  },
+  'feast-muster': {
+    battlePlanId: 'feast-muster',
+    name: "The Duke's Muster",
+    keyItems: ['ale', 'grain'],
+    winServiceLevel: 0.85,
+    victory: 'The Duke drank deep and pledged three more lances to the war.',
+    defeat: 'The casks ran dry before the toasts. The Duke rode home in a temper, and his lances went with him.',
+  },
+  'winter-crossing': {
+    battlePlanId: 'winter-crossing',
+    name: 'The Crossing of the Northern Pass',
+    keyItems: ['oats', 'horseshoes'],
+    winServiceLevel: 0.9,
+    victory: 'Every horse came over the pass shod and fed. The enemy never saw us coming.',
+    defeat: 'Lame and starving horses littered the switchbacks. Half the cavalry turned back.',
+  },
+  'ford-feint': {
+    battlePlanId: 'ford-feint',
+    name: 'The Feint at Brackenford',
+    keyItems: ['arrows', 'bolts', 'bowstrings'],
+    winServiceLevel: 0.9,
+    victory: 'Our volleys never slackened. The enemy swallowed the bait and marched south.',
+    defeat: 'The volleys thinned and the enemy saw through the feint.',
+  },
+  'levies-arrive': {
+    battlePlanId: 'levies-arrive',
+    name: 'Feeding the Levies',
+    keyItems: ['grain', 'ale'],
+    winServiceLevel: 0.9,
+    victory: "The Earl's levies were fed from the first night. They will follow you anywhere.",
+    defeat: "The levies went hungry and began to desert. The Earl's goodwill is spent.",
+  },
+};

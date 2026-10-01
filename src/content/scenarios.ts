@@ -87,6 +87,8 @@ interface ScenarioSpec {
   lines: LineSpec[];
   battlePlanIds?: string[];
   morale?: number;
+  /** Starting rank level (0–6); default rules.rank.startLevel. */
+  rankLevel?: number;
 }
 
 function pick<T>(record: Record<string, T>, ids: string[]): Record<string, T> {
@@ -186,6 +188,7 @@ function buildScenario(s: ScenarioSpec): Scenario {
       battlePlans,
       periods: buildPeriods(s.lengthDays, s.periodLengthDays, periodAllowance),
       morale: s.morale ?? 80,
+      ...(s.rankLevel !== undefined ? { rankLevel: s.rankLevel } : {}),
     },
   };
 }
@@ -201,8 +204,8 @@ const tutorial: ScenarioSpec[] = [
     briefing:
       'You are newly sworn as Quartermaster of the Eastern Camp. Your first charge is humble: ' +
       "keep the surgeons' tent in linen bandages. Brother Fennick's apothecary delivers the day " +
-      'after you order. Each morning the clerks draw up an ORDER PROPOSAL from the forecast — ' +
-      'accept it, change it, or reject it, then watch the PROJECTED STOCK line. Never let it touch zero.',
+      'after you order. Each morning the clerks draw up an ORDER PROPOSAL from the forecast. ' +
+      'Accept it, change it, or reject it, then watch the PROJECTED STOCK line. Never let it touch zero.',
     teaches: ['forecast', 'projected stock', 'order proposal'],
     seed: 1101,
     lengthDays: 14,
@@ -215,7 +218,7 @@ const tutorial: ScenarioSpec[] = [
     id: 'tutorial-2',
     title: 'II. Three Days on the Abbey Road',
     briefing:
-      "Grain comes from St. Aldric's Abbey — but the brothers take orders only on Mondays and " +
+      "Grain comes from St. Aldric's Abbey, but the brothers take orders only on Mondays and " +
       'Thursdays, and the carts need three days on the road. An order placed today arrives on D1. ' +
       'The NEXT chance to order arrives on D2. Whatever you order today must carry the camp all the ' +
       'way to D2, because nothing else can arrive before then.',
@@ -232,20 +235,20 @@ const tutorial: ScenarioSpec[] = [
     title: 'III. Fog of the Front',
     briefing:
       'At the Siege Lines of Harrowmere no two days are alike. Grain is steady; hardtack goes ' +
-      'whenever the sorties go out. Holding nothing beyond the forecast is a gamble. SAFETY STOCK ' +
-      'covers forecast error over the lead time and review period, scaled by the SERVICE LEVEL you ' +
-      'demand. The Marshal also insists a cartload of grain always stands at camp (PRESENTATION ' +
-      'STOCK). Together they make the MUST ORDER POINT: if projected stock at D2 falls below the ' +
-      'MOP, you must order.',
-    teaches: ['forecast error', 'safety stock', 'service level', 'presentation stock', 'MOP'],
+      'whenever the sorties go out. SAFETY STOCK covers forecast error over the lead time and review ' +
+      'period, scaled by the SERVICE LEVEL you demand. The Marshal also insists three cartloads of ' +
+      'grain (30 sacks) always stand at camp: a MINIMUM FILL. The MUST ORDER POINT is the LARGER of ' +
+      'the two. For steady grain the Marshal\'s 30 sacks decide it; for volatile hardtack, safety ' +
+      'stock does. If projected stock at D2 falls below the MOP, you must order.',
+    teaches: ['forecast error', 'safety stock', 'service level', 'minimum fill', 'MOP = max(safety stock, minimum fill)'],
     seed: 1303,
     lengthDays: 28,
     periodLengthDays: 28,
     allowanceFactor: 1.1,
     vendorIds: ['abbey-granary'],
     lines: [
-      { itemId: 'grain', depotId: 'harrowmere', demand: { cv: 0.12 }, onHandDays: 7, serviceLevel: 0.98, minimumFill: 20 },
-      { itemId: 'hardtack', depotId: 'harrowmere', demand: { cv: 0.45 }, onHandDays: 7, serviceLevel: 0.9 },
+      { itemId: 'grain', depotId: 'harrowmere', demand: { cv: 0.12 }, onHandDays: 7, serviceLevel: 0.95, minimumFill: 30 },
+      { itemId: 'hardtack', depotId: 'harrowmere', demand: { cv: 0.45 }, onHandDays: 7, serviceLevel: 0.95 },
     ],
   },
   {
@@ -253,9 +256,9 @@ const tutorial: ScenarioSpec[] = [
     title: 'IV. By the Barrel and the Cask',
     briefing:
       'Merchants do not sell by the single biscuit. Ale comes from the abbey twelve casks to the ' +
-      'wagon; salt pork by the barge-lot of four barrels; hardtack five crates to the bundle. ' +
-      'Orders are rounded up to the PACK SIZE — which keeps you safe, but ale sours in ten days. ' +
-      'Round up too far and you will be pouring vinegar into the ditch.',
+      'wagon, salt pork by the barge-lot of four barrels, hardtack five crates to the bundle. ' +
+      'Orders are always rounded up to the PACK SIZE. That keeps you safe, but ale sours in ten ' +
+      'days. Push orders up too far and you will be pouring vinegar into the ditch.',
     teaches: ['pack size', 'rounding', 'shelf life', 'spoilage', 'holding cost'],
     seed: 1404,
     lengthDays: 28,
@@ -272,34 +275,53 @@ const tutorial: ScenarioSpec[] = [
     id: 'tutorial-5',
     title: "V. The Guild's Terms",
     briefing:
-      'The Northern Pass garrison is small, and so are its orders — too small for the Guild of ' +
-      'Fletchers, who will not ship fewer than 120 units, and for the Ironhollow smith, who wants ' +
-      '250 silver before he loads his mules. When a must-order falls short of a VENDOR MINIMUM, ' +
-      'the clerks pull forward items that sit between MOP and the CAN ORDER POINT, lowest days ' +
-      'of cover first. If that still falls short, the choice is yours: pay up, wait, or refuse.',
-    teaches: ['vendor minimum', 'can order point (COP)', 'must vs can', 'days of cover'],
+      'The Guild of Fletchers will not ship fewer than 120 arrows-and-strings a week. Your Northern ' +
+      'Pass garrison needs only about seventy. The Guild\'s ORDER TRIGGER is 50%: once your real ' +
+      'must-order need reaches half the minimum, the clerks BUILD the order up to the minimum, one ' +
+      'pack at a time of whichever item has the fewest days of cover at D2. You get a full order and ' +
+      'carry the extra stock. You may still refuse it if the silver hurts.',
+    teaches: ['vendor minimum', 'order trigger', 'order build-up', 'days of cover'],
     seed: 1505,
     lengthDays: 28,
     periodLengthDays: 28,
-    allowanceFactor: 1.1,
-    vendorIds: ['guild-fletchers', 'mountain-smithy'],
+    allowanceFactor: 1.3,
+    vendorIds: ['guild-fletchers'],
     lines: [
       { itemId: 'arrows', depotId: 'northern-pass', demand: { mean: 8 }, onHandDays: 9 },
       { itemId: 'bowstrings', depotId: 'northern-pass', demand: { mean: 2 }, onHandDays: 12 },
-      { itemId: 'horseshoes', depotId: 'northern-pass', demand: { mean: 3 }, onHandDays: 10 },
-      { itemId: 'mail-rings', depotId: 'northern-pass', demand: { mean: 0.3 }, onHandDays: 20 },
     ],
   },
   {
     id: 'tutorial-6',
-    title: 'VI. Two Roads to the Granary',
+    title: "VI. The Smith Won't Climb for Less",
+    briefing:
+      'The Ironhollow smith wants 250 silver of work before his mules climb to the pass, and his ' +
+      'ORDER TRIGGER stands at 80%. A garrison\'s weekly need for shoes and mail rings comes to ' +
+      'about three-quarters of that, so NO PROPOSAL APPEARS. The need is real, but it is below the ' +
+      'trigger. Watch the smithy\'s need-to-minimum ratio on the Proposals screen. Lower the trigger ' +
+      'to let a smaller need build into a full order, or let the shortfall grow and pay for it in ' +
+      'lame horses. The smith takes a week to deliver, so do not wait long.',
+    teaches: ['order trigger', 'below-trigger (no proposal)', 'adjusting the trigger', 'lead time risk'],
+    seed: 1606,
+    lengthDays: 28,
+    periodLengthDays: 28,
+    allowanceFactor: 1.3,
+    vendorIds: ['mountain-smithy'],
+    lines: [
+      { itemId: 'horseshoes', depotId: 'northern-pass', demand: { mean: 3 }, onHandDays: 10 },
+      { itemId: 'mail-rings', depotId: 'northern-pass', demand: { mean: 0.6 }, onHandDays: 12 },
+    ],
+  },
+  {
+    id: 'tutorial-7',
+    title: 'VII. Two Roads to the Granary',
     briefing:
       'Rely on one supplier and one flood will starve you. Grain now comes first from the abbey, ' +
       'and from the Silverwash barges when the abbey cannot. The horses are fed by both: three ' +
-      "parts abbey oats to two parts river oats. Arrows come from the Guild, or — dearer, and in " +
-      "lots of fifty — from the Royal Armory. Watch for late barges: the river is fast but fickle.",
+      "parts abbey oats to two parts river oats. Arrows come from the Guild, or, dearer and in " +
+      "lots of fifty, from the Royal Armory. Watch for late barges: the river is fast but fickle.",
     teaches: ['multi-sourcing', 'source priority', 'split sourcing', 'vendor reliability'],
-    seed: 1606,
+    seed: 1707,
     lengthDays: 35,
     periodLengthDays: 28,
     allowanceFactor: 1.3,
@@ -311,26 +333,50 @@ const tutorial: ScenarioSpec[] = [
     ],
   },
   {
-    id: 'tutorial-7',
-    title: "VII. Letters from the Marshal",
+    id: 'tutorial-8',
+    title: "VIII. The Earl's Levies",
     briefing:
-      'Two depots, one treasury, and a war that will not wait. Sealed letters will arrive ' +
-      'announcing BATTLE PLANS — assaults, musters, feasts — each promising so many times the ' +
-      'usual demand. Some generals are honest; some are not. Decide how much of the stated uplift ' +
-      'to trust, build stock ahead of the event, and keep spending inside each FISCAL PERIOD\'s ' +
-      'allowance. Overspend and the next allowance is cut — and the men notice.',
-    teaches: ['battle plans (promotions)', 'event uplift', 'forecast override', 'forecast accuracy', 'budget', 'fiscal period'],
-    seed: 1707,
+      "A letter: the Earl of Fennmarch's levies join the Eastern Camp on day 14 and stay to the end. " +
+      'It gives no figures, so the system FORECAST cannot know, and it will keep proposing for ' +
+      'yesterday\'s army. Ask how many are coming (half again as many mouths, and thirstier), then ' +
+      'enter a FORECAST OVERRIDE: a daily figure, or a total over the days, broken out in proportion ' +
+      'to the baseline. An override IS the forecast, and orders follow it, until you delete it. ' +
+      'Remember the lead time: the first carts must leave before the levies arrive.',
+    teaches: ['forecast override', 'aggregate override', 'override replaces forecast', 'forecast accuracy (SWAPE, bias)'],
+    seed: 1808,
+    lengthDays: 35,
+    periodLengthDays: 35,
+    allowanceFactor: 1.35,
+    vendorIds: ['abbey-granary', 'river-merchants', 'apothecary'],
+    lines: [
+      { itemId: 'grain', depotId: 'eastern-camp', onHandDays: 6 },
+      { itemId: 'ale', depotId: 'eastern-camp', sources: ['abbey-granary'], onHandDays: 4 },
+      { itemId: 'bandages', depotId: 'eastern-camp', onHandDays: 4 },
+    ],
+    battlePlanIds: ['levies-arrive'],
+  },
+  {
+    id: 'tutorial-9',
+    title: 'IX. Letters from the Marshal',
+    briefing:
+      'Two depots, one treasury, and a war that will not wait. Sealed letters will announce ' +
+      'BATTLE PLANS (assaults, musters, feasts), each promising so many times the usual demand. ' +
+      'Some generals are honest; some are not. Decide how much of each stated uplift to trust, build ' +
+      'stock before the event, and keep spending within each FISCAL PERIOD\'s allowance. Supply the ' +
+      'army through a battle and it wins; starve it and it loses, and so do you. Overspend and the ' +
+      'Treasury writes letters of reprimand. Enough of them cost you your rank.',
+    teaches: ['battle plans (promotions)', 'event uplift', 'trusting the letter', 'budget', 'fiscal period', 'rank'],
+    seed: 1909,
     lengthDays: 56,
     periodLengthDays: 28,
     allowanceFactor: 1.1,
     vendorIds: ['abbey-granary', 'river-merchants', 'guild-fletchers', 'royal-armory', 'apothecary'],
     lines: [
-      // Guild only: level VI already taught fallback sourcing; here the budget is about the letters.
+      // Guild only: level VII already taught fallback sourcing; here the budget is about the letters.
       { itemId: 'arrows', depotId: 'harrowmere', sources: ['guild-fletchers'], onHandDays: 9 },
       { itemId: 'pitch', depotId: 'harrowmere', onHandDays: 8 },
       { itemId: 'siege-rope', depotId: 'harrowmere', onHandDays: 12 },
-      { itemId: 'bandages', depotId: 'harrowmere', onHandDays: 4 },
+      { itemId: 'bandages', depotId: 'harrowmere', onHandDays: 4, minimumFill: 20 },
       { itemId: 'grain', depotId: 'harrowmere', onHandDays: 6 },
       { itemId: 'grain', depotId: 'eastern-camp', onHandDays: 6 },
       { itemId: 'ale', depotId: 'eastern-camp', onHandDays: 4 },
