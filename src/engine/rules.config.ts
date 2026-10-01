@@ -37,6 +37,37 @@ export interface Rules {
     perUnitStockoutByCriticality: number;
     dailyRecovery: number;
   };
+  /** §2 projection conventions. */
+  projection: {
+    /**
+     * Where proj[D2] is read. 'before-d2-receipt' = end of day D2 − 1 (spec default);
+     * 'end-of-d2' = end of D2 including the D2 receipt and D2's forecast.
+     */
+    measureAtD2: 'before-d2-receipt' | 'end-of-d2';
+    /** Unmet demand is lost (stock clamps at 0) rather than backordered (stock goes negative). */
+    lostSales: boolean;
+  };
+  /** §3 σ(forecast error): RMSE of one-step-ahead baseline forecasts over the last `window` days. */
+  forecastError: { window: number };
+  /** A must order that rounds to 0 packs still orders one pack. */
+  mustOrderMinOnePack: boolean;
+  /** Actual demand generator (hidden from the player). */
+  demand: {
+    /** Underlying rate = mean of the last `baseWindow` days of history. */
+    baseWindow: number;
+    /** Noise: sd = noiseCv × rate (normal, clamped ≥ 0, rounded to whole units). */
+    noiseCv: number;
+  };
+  exceptions: {
+    /** Flag forecast-deviation when |actual − forecast| / forecast exceeds this. */
+    forecastDeviationPct: number;
+  };
+  /**
+   * Spoilage approximation until lots are tracked (see docs/contract-requests.md):
+   * stock beyond `shelfLifeDays` × baseline forecast cannot be sold in time under FIFO;
+   * 1/shelfLifeDays of that excess spoils each day.
+   */
+  spoilage: { mode: 'cover-excess' };
 }
 
 /** Inverse standard normal approximation (Acklam) — good enough for service-level z. */
@@ -67,4 +98,10 @@ export const rules: Rules = {
   vendorMinFillPriority: 'days-of-cover',
   budget: { overspendTolerance: 0, overspendCarryPenalty: 1, moralePerOverspendPct: 0.5 },
   morale: { perUnitStockoutByCriticality: 0.05, dailyRecovery: 0.5 },
+  projection: { measureAtD2: 'before-d2-receipt', lostSales: true },
+  forecastError: { window: 14 },
+  mustOrderMinOnePack: true,
+  demand: { baseWindow: 28, noiseCv: 0.2 },
+  exceptions: { forecastDeviationPct: 0.3 },
+  spoilage: { mode: 'cover-excess' },
 };
