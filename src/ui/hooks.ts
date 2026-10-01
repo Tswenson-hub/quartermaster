@@ -199,7 +199,7 @@ export interface ProposalLine {
   packSize: number;
   /** Display cost at `qty` (engine re-prices on accept). */
   cost: number;
-  /** Accepted, but the engine would not ship it (e.g. below vendor minimum, no surcharge). */
+  /** Accepted, but the engine would not ship it (e.g. order fell below the vendor minimum). */
   dropped: boolean;
 }
 

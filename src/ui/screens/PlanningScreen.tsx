@@ -1,11 +1,11 @@
-import { useState } from 'react';
 import type { GameState, ItemLocation } from '../../engine/types';
+import { ForecastGrid, OverridePanel } from '../components/ForecastEditor';
 import { ItemIcon } from '../components/ItemIcon';
 import { Panel } from '../components/Panel';
 import { PlanningCharts } from '../components/PlanningCharts';
 import { Term } from '../components/Term';
 import { fmtDay, fmtQty } from '../format';
-import { useGame, useGameActions, usePlanningView } from '../hooks';
+import { useGame, usePlanningView } from '../hooks';
 import { useUiStore } from '../uiStore';
 
 const keyOf = (l: Pick<ItemLocation, 'itemId' | 'depotId'>) => `${l.itemId}@${l.depotId}`;
@@ -59,14 +59,11 @@ export function PlanningScreen() {
 
 function ItemDetail({ game, loc }: { game: GameState; loc: ItemLocation }) {
   const view = usePlanningView(loc.itemId, loc.depotId);
-  const { setOverride, clearOverride } = useGameActions();
-  const [factor, setFactor] = useState('1.2');
   const item = game.items[loc.itemId];
   if (!view || !item) return null;
   const { params, proposal } = view;
   const vendor = params ? game.vendors[params.vendorId] : undefined;
   const belowMop = params ? params.projectedAtD2 < params.mustOrderPoint : false;
-  const overrides = game.overrides.filter((o) => o.itemId === loc.itemId && o.depotId === loc.depotId);
 
   return (
     <div className="stack">
@@ -143,40 +140,9 @@ function ItemDetail({ game, loc }: { game: GameState; loc: ItemLocation }) {
           )}
         </Panel>
 
-        <Panel title="Adjust the forecast" flavour="Overrule the clerk if you know better.">
-          <p className="muted small">
-            Multiply the <Term k="forecast">forecast</Term> for the next 14 days (from {fmtDay(game.today)}). Proposals are
-            recalculated, and today’s decisions are cleared.
-          </p>
-          <form
-            className="override-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const value = Number(factor);
-              if (!Number.isFinite(value) || value <= 0) return;
-              setOverride({ itemId: loc.itemId, depotId: loc.depotId, from: game.today, to: game.today + 13, mode: 'factor', value });
-            }}
-          >
-            <label>
-              Factor ×
-              <input type="number" min="0.1" max="5" step="0.1" value={factor} onChange={(e) => setFactor(e.target.value)} />
-            </label>
-            <button type="submit" className="btn btn-small">Apply</button>
-          </form>
-          {overrides.length > 0 && (
-            <div className="override-list">
-              {overrides.map((o, i) => (
-                <div key={i}>
-                  {o.mode === 'factor' ? `×${o.value}` : `${o.value}/day`} from {fmtDay(o.from)} to {fmtDay(o.to)}
-                </div>
-              ))}
-              <button type="button" className="btn btn-small btn-ghost" onClick={() => clearOverride(loc.itemId, loc.depotId)}>
-                Clear overrides
-              </button>
-            </div>
-          )}
-        </Panel>
+        <OverridePanel view={view} item={item} />
       </div>
+      <ForecastGrid view={view} item={item} />
     </div>
   );
 }
