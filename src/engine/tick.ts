@@ -297,7 +297,14 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
     kpi.fulfilled += fulfilled;
     kpi.spoiled += spoiled;
     kpi.holdingCost += stock * (item?.holdingCost ?? 0);
-    const next: ItemLocation = { ...loc, onHand: stock, history: [...loc.history, demand] };
+    // fulfilled[d] is campaign day d; a location without it (older save) is back-filled as fully served.
+    const pastFulfilled = loc.fulfilled ?? loc.history.slice(loc.history.length - t);
+    const next: ItemLocation = {
+      ...loc,
+      onHand: stock,
+      history: [...loc.history, demand],
+      fulfilled: [...pastFulfilled, fulfilled],
+    };
     if (lots) next.lots = lots;
     return next;
   });
@@ -326,7 +333,7 @@ export function tick(state: GameState, r: Rules = defaultRules): GameState {
   morale = clamp(morale + r.morale.dailyRecovery, 0, 100);
 
   const kpis = [...state.kpis, kpi];
-  const career = updateCareer(state, t, kpis, period && period.end === t ? period : undefined, r);
+  const career = updateCareer(state, t, kpis, locations, period && period.end === t ? period : undefined, r);
 
   const next: GameState = {
     ...state,
