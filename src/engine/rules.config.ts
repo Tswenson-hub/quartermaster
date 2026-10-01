@@ -63,6 +63,8 @@ export interface Rules {
     /** Noise: sd = noiseCv × rate (normal, clamped ≥ 0, rounded to whole units). */
     noiseCv: number;
   };
+  /** §10 KPIs. Days of supply = on hand ÷ mean daily forecast over the next `daysOfSupplyHorizon` days. */
+  kpi: { daysOfSupplyHorizon: number };
   exceptions: {
     /** Flag forecast-deviation when |actual − forecast| / forecast exceeds this. */
     forecastDeviationPct: number;
@@ -113,6 +115,7 @@ export const rules: Rules = {
   forecastError: { window: 14 },
   mustOrderMinOnePack: true,
   demand: { baseWindow: 28, noiseCv: 0.2 },
+  kpi: { daysOfSupplyHorizon: 7 },
   exceptions: { forecastDeviationPct: 0.3 },
   spoilage: { mode: 'lots' },
   delivery: { lateDaysMin: 1, lateDaysMax: 2 },
