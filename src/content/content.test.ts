@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { rules } from '../engine/rules.config';
 import { generateHistory } from './history';
 import { BASE_DEMAND, BATTLE_PLANS, ITEMS, SOURCING, VENDORS, scenarios } from './index';
 
@@ -24,6 +25,13 @@ describe('content', () => {
     }
     const multi = new Set(SOURCING.map((r) => r.itemId).filter((id, i, a) => a.indexOf(id) !== i));
     expect(multi.size).toBeGreaterThanOrEqual(3);
+  });
+
+  it('outside vendors take at least rules.minVendorLeadTimeDays to deliver', () => {
+    for (const v of Object.values(VENDORS)) {
+      if (v.dcDepotId) continue;
+      expect(v.leadTimeDays, v.id).toBeGreaterThanOrEqual(rules.minVendorLeadTimeDays);
+    }
   });
 
   it('vendor lead times are 1–7 days with valid weekdays', () => {
