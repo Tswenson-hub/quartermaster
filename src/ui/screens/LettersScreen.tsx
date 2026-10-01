@@ -64,7 +64,12 @@ export function LettersScreen() {
       )}
 
       <div className="letters-grid">
-        <Panel title="Letters from command" flavour="Reprimands, praise and news from the front." className="letters-list-panel">
+        <Panel
+          title="Letters from command"
+          flavour="Reprimands, praise and news from the front."
+          className="letters-list-panel"
+          testId="letters-inbox"
+        >
           {newest.length === 0 ? (
             <p className="empty">No letters yet. Command is watching.</p>
           ) : (

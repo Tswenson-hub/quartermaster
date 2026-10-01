@@ -10,6 +10,7 @@ export function TitleScreen() {
   const starting = useStarting();
   const { newGame } = useGameActions();
   const go = useUiStore((s) => s.go);
+  const resetCampaign = useUiStore((s) => s.resetCampaign);
   const [difficulty, setDifficulty] = useState<Difficulty>(options.find((o) => o.id === 'normal')?.id ?? options[0]?.id ?? 'normal');
 
   return (
@@ -56,6 +57,7 @@ export function TitleScreen() {
                 data-testid={`start-scenario-${s.id}`}
                 disabled={starting}
                 onClick={async () => {
+                  resetCampaign();
                   await newGame(s, difficulty);
                   go('dispatch');
                 }}

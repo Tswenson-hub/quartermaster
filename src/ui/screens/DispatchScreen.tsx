@@ -1,9 +1,11 @@
 import type { ExceptionKind, PlanningException } from '../../engine/types';
 import { ItemIcon } from '../components/ItemIcon';
+import { KpiPanel } from '../components/KpiPanel';
 import { Panel } from '../components/Panel';
 import { Term } from '../components/Term';
 import { fmtDay, fmtQty } from '../format';
-import { useExceptionsToday, useGame } from '../hooks';
+import { useExceptionsToday, useGame, useLetterTexts } from '../hooks';
+import { LetterSeal } from './LettersScreen';
 import { useUiStore } from '../uiStore';
 
 const KIND: Record<ExceptionKind, { label: string; severity: 'critical' | 'serious' | 'warning' | 'info' }> = {
@@ -23,6 +25,8 @@ export function DispatchScreen() {
   const game = useGame();
   const today = useExceptionsToday();
   const { go, planItem, openLetter } = useUiStore();
+  const read = useUiStore((s) => s.readLetters);
+  const commandLetters = useLetterTexts().filter(({ letter }) => !read[letter.id]);
   if (!game) return null;
 
   const earlier = game.exceptions.filter((e) => e.day < game.today).sort((a, b) => b.day - a.day).slice(0, 8);
@@ -68,6 +72,8 @@ export function DispatchScreen() {
   };
 
   return (
+    <div className="stack">
+    <KpiPanel />
     <div className="screen-grid dispatch-grid">
       <Panel
         title={
@@ -101,6 +107,16 @@ export function DispatchScreen() {
       </Panel>
 
       <div className="stack">
+        {commandLetters.length > 0 && (
+          <Panel title="Letters from command" flavour="Unread, on your field desk.">
+            {commandLetters.map(({ letter, text }) => (
+              <button key={letter.id} type="button" className="mini-letter" onClick={() => go('letters')}>
+                <LetterSeal letter={letter} size={28} />
+                <span>{text.subject}</span>
+              </button>
+            ))}
+          </Panel>
+        )}
         {letters.length > 0 && (
           <Panel title="A sealed letter arrives" flavour="Bearing the Marshal’s seal.">
             {letters.map((l) => (
@@ -139,6 +155,7 @@ export function DispatchScreen() {
           )}
         </Panel>
       </div>
+    </div>
     </div>
   );
 }

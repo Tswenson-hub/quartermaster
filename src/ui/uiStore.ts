@@ -17,6 +17,8 @@ interface UiState {
   seenBattles: Record<BattlePlanId, true>;
   /** Draft quantity edits per proposal index, before the player accepts. */
   draftQty: Record<number, number>;
+  /** After the campaign ends, the player chose to look around instead of the end panel. */
+  reviewingEnd: boolean;
   go: (screen: Screen) => void;
   planItem: (itemId: ItemId, depotId: DepotId) => void;
   openLetter: (id: BattlePlanId) => void;
@@ -24,6 +26,7 @@ interface UiState {
   seeBattle: (id: BattlePlanId) => void;
   setDraftQty: (index: number, qty: number | null) => void;
   clearDrafts: () => void;
+  reviewEnd: () => void;
   /** Forget everything tied to the current campaign. */
   resetCampaign: () => void;
 }
@@ -35,6 +38,7 @@ const campaignDefaults = {
   readLetters: {},
   seenBattles: {},
   draftQty: {},
+  reviewingEnd: false,
 };
 
 export const useUiStore = create<UiState>()(
@@ -54,6 +58,7 @@ export const useUiStore = create<UiState>()(
           return { draftQty };
         }),
       clearDrafts: () => set({ draftQty: {} }),
+      reviewEnd: () => set({ reviewingEnd: true }),
       resetCampaign: () => set(campaignDefaults),
     }),
     {

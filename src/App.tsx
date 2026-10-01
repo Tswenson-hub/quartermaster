@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense } from 'react';
 import { BattleReport } from './ui/components/BattleReport';
 import { NavRail } from './ui/components/NavRail';
 import { TopBar } from './ui/components/TopBar';
@@ -28,7 +28,8 @@ export default function App() {
   const game = useGame();
   const screen = useUiStore((s) => s.screen);
   // The end-of-campaign panel replaces the screen until the player chooses to review the ledger.
-  const [reviewing, setReviewing] = useState(false);
+  const reviewing = useUiStore((s) => s.reviewingEnd);
+  const reviewEnd = useUiStore((s) => s.reviewEnd);
   if (!game) return <TitleScreen />;
   const ended = game.status !== 'playing';
   const Screen = SCREENS[screen];
@@ -40,7 +41,7 @@ export default function App() {
         <NavRail />
         <main className="content">
           <Suspense fallback={<p className="empty loading">Unrolling the ledger…</p>}>
-            {ended && !reviewing ? <GameOverScreen onReview={() => setReviewing(true)} /> : <Screen />}
+            {ended && !reviewing ? <GameOverScreen onReview={reviewEnd} /> : <Screen />}
           </Suspense>
         </main>
       </div>

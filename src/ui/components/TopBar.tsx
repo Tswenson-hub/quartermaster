@@ -1,4 +1,5 @@
-import { useGame, useGameActions, useScenario, useScenarioOver, useServiceLevel, useTreasury } from '../hooks';
+import { useGame, useGameActions, useMarketInfo, useRank, useScenario, useScenarioOver, useServiceLevel, useTreasury } from '../hooks';
+import { RankBadge } from './RankBadge';
 import { fmtSilver, weekdayName } from '../format';
 import { useUiStore } from '../uiStore';
 import { Term } from './Term';
@@ -11,6 +12,10 @@ export function TopBar() {
   const serviceLevel = useServiceLevel();
   const { endDay, quitGame } = useGameActions();
   const clearDrafts = useUiStore((s) => s.clearDrafts);
+  const resetCampaign = useUiStore((s) => s.resetCampaign);
+  const go = useUiStore((s) => s.go);
+  const rank = useRank();
+  const market = useMarketInfo();
   if (!game) return null;
 
   const morale = Math.round(game.morale);
@@ -27,12 +32,24 @@ export function TopBar() {
         </div>
       </div>
 
+      {rank && (
+        <button type="button" className="rank-chip" onClick={() => go('letters')} data-testid="rank" title={rank.flavour}>
+          <RankBadge level={Math.max(0, rank.level)} size={32} />
+          <span className="rank-chip-text">
+            <span className="rank-chip-label">
+              <Term k="rank">Rank</Term>
+            </span>
+            <span className="rank-chip-title">{rank.title}</span>
+          </span>
+        </button>
+      )}
+
       <dl className="topbar-stats">
         <div className="stat">
           <dt>Day</dt>
           <dd>
             {weekdayName(game.today)} <span data-testid="today">{game.today}</span>
-            {scenario && <span className="muted"> / {scenario.lengthDays}</span>}
+            <span className="muted"> / {game.lengthDays}</span>
           </dd>
         </div>
         <div className="stat">
@@ -56,6 +73,18 @@ export function TopBar() {
             <span data-testid="kpi-service-level">{serviceLevel}</span>%
           </dd>
         </div>
+        {market && (
+          <div className="stat">
+            <dt>
+              <Term k="market">Market</Term>
+            </dt>
+            <dd className="market-chip" data-testid="market">
+              <span className="market-ticker">{market.ticker}</span>
+              <span className={`market-src ${market.source}`}>{market.source}</span>
+              {market.synthetic && <span className="market-src synthetic">synthetic placeholder</span>}
+            </dd>
+          </div>
+        )}
       </dl>
 
       <div className="topbar-actions">
@@ -63,7 +92,10 @@ export function TopBar() {
           type="button"
           className="btn btn-ghost"
           onClick={() => {
-            if (confirm('Abandon this campaign? Your progress will be lost.')) quitGame();
+            if (confirm('Abandon this campaign? Your progress will be lost.')) {
+              quitGame();
+              resetCampaign();
+            }
           }}
         >
           Abandon

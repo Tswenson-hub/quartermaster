@@ -30,6 +30,7 @@ export function KpiPanel() {
 
   return (
     <Panel
+      testId="kpi-panel"
       title="The quartermaster’s ledger"
       flavour="How well the army is kept, as the Lord Marshal reckons it."
       actions={
