@@ -70,6 +70,15 @@ export interface Rules {
   kpi: { daysOfSupplyHorizon: number };
   /** Master Data screen windows: average sales over the last N days, average forecast over the next N days. */
   masterData: { salesWindowDays: number; forecastWindowDays: number };
+  /** Warm-up before takeover: the previous quartermaster accepts every proposal for `days` (multiple of 7). */
+  warmup: { days: number };
+  /** Every outside vendor's lead time is at least this many days (goods travel from the vendor). */
+  minVendorLeadTimeDays: number;
+  /**
+   * Distribution centres. DC holding cost = item holdingCost × holdingCostFactor (cheaper to carry stock
+   * there). DC demand = depots' planned transfer orders over plannedOrderHorizonDays.
+   */
+  dc: { holdingCostFactor: number; plannedOrderHorizonDays: number };
   exceptions: {
     /** Flag forecast-deviation when |actual − forecast| / forecast exceeds this. */
     forecastDeviationPct: number;
@@ -162,6 +171,9 @@ export const rules: Rules = {
   demand: { baseWindow: 28, noiseCv: 0.1 },
   kpi: { daysOfSupplyHorizon: 7 },
   masterData: { salesWindowDays: 28, forecastWindowDays: 7 },
+  warmup: { days: 14 },
+  minVendorLeadTimeDays: 3,
+  dc: { holdingCostFactor: 0.5, plannedOrderHorizonDays: 28 },
   exceptions: { forecastDeviationPct: 0.3 },
   spoilage: { mode: 'lots' },
   delivery: { lateDaysMin: 1, lateDaysMax: 2 },

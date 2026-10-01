@@ -67,6 +67,9 @@ export function initGame(scenario: Scenario, setup?: GameSetup, r: Rules = defau
   const state: GameState = {
     ...initial,
     today: 0,
+    // TODO(engine): warm-up. Play scenario.warmupDays ?? rules.warmup.days auto-accepting, shift battle plans,
+    // then startDay = warm-up and lengthDays = warm-up + scenario.lengthDays.
+    startDay: 0,
     lengthDays: scenario.lengthDays,
     periods,
     // An opening order's promised date is the date the scenario gives it.

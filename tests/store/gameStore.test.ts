@@ -8,7 +8,7 @@ vi.stubGlobal('localStorage', {
   removeItem: (k: string) => void memory.delete(k),
 });
 
-const { useGameStore, SAVE_KEY, isScenarioOver } = await import('../../src/store');
+const { useGameStore, SAVE_KEY, isScenarioOver, warmupDays } = await import('../../src/store');
 
 beforeEach(() => {
   memory.clear();
@@ -121,7 +121,7 @@ describe('M2 store actions', () => {
     expect(game.difficulty).toBe('hard');
     expect(game.market.ticker).toBe('TSLA');
     expect(game.market.source).toBe('snapshot');
-    expect(game.market.values).toHaveLength(fixtureScenario.lengthDays);
+    expect(game.market.values).toHaveLength(warmupDays(fixtureScenario) + fixtureScenario.lengthDays);
   });
 
   it('newGame without an API key falls back to the snapshot', async () => {

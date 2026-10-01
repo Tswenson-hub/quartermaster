@@ -31,6 +31,7 @@ export function state(extra: Partial<GameState> = {}): GameState {
   return {
     seed: 42,
     today: 0,
+    startDay: 0,
     lengthDays: 56,
     items: { grain: item('grain') },
     vendors: { v: vendor('v') },

@@ -46,6 +46,12 @@ export interface Vendor {
   /** Vendor minimum order, if any (RELEX_RULES §4, §6). */
   minimum?: { kind: 'value' | 'units'; amount: number };
   /**
+   * Set when this "vendor" is an internal distribution centre (a transfer lane), not an outside supplier.
+   * Orders against it are transfers: they ship from that DC's on-hand (short-ship if it lacks stock),
+   * cost nothing against the budget, and have no minimum. orderDays/leadTimeDays describe the lane.
+   */
+  dcDepotId?: DepotId;
+  /**
    * Default order trigger for a vendor with a minimum: the fraction (0–1+) of the minimum that the real
    * need must reach before the system builds the order up to the minimum. Below it, no proposal is made
    * for this vendor. Falls back to rules.vendorMinimum.defaultTrigger. The player can override it per
@@ -67,11 +73,22 @@ export interface SourcingRule {
   priority: number;
   /** Optional fixed share of volume for split sourcing (0–1). Shares per item sum to 1. */
   splitShare?: number;
+  /**
+   * Locations this rule applies to; absent = every location of the item. Lets front depots source an
+   * item from a DC while the DC itself sources it from vendors.
+   */
+  depotIds?: DepotId[];
 }
 
 export interface Depot {
   id: DepotId;
   name: string; // "Eastern Camp", "Siege Lines at Harrowmere"
+  /**
+   * 'front' (default): consumes stock (actual demand). 'dc': distribution centre with no consumption of its
+   * own; it buys from vendors and supplies front depots by transfer. Its demand is the depots' planned
+   * transfer orders (dependent demand).
+   */
+  kind?: 'front' | 'dc';
 }
 
 /** Planning parameters for one item at one depot. */
@@ -232,7 +249,9 @@ export type ExceptionKind =
   | 'over-budget'
   | 'spoilage'
   /** Actual stockout: demand went unmet on `day`. (stockout-risk is the forward-looking one.) */
-  | 'stockout';
+  | 'stockout'
+  /** A DC could not ship a transfer in full: the depot gets less than it ordered. */
+  | 'dc-short';
 
 export interface PlanningException {
   kind: ExceptionKind;
@@ -358,7 +377,12 @@ export type GameStatus = 'playing' | 'complete' | 'lost';
 export interface GameState {
   seed: number;
   today: Day;
-  /** Campaign length (scenario.lengthDays). today ≥ lengthDays → status 'complete'. */
+  /**
+   * Day the player takes command. Days before it were played by the previous quartermaster (warm-up,
+   * auto-accepting every proposal; no rank or letters). Equals the warm-up length.
+   */
+  startDay: Day;
+  /** Last day + 1: startDay + scenario.lengthDays. today ≥ lengthDays → status 'complete'. */
   lengthDays: number;
   items: Record<ItemId, Item>;
   vendors: Record<VendorId, Vendor>;
@@ -393,6 +417,7 @@ export interface GameState {
 /** GameState fields built by initGame, not provided by scenarios. */
 export type RuntimeField =
   | 'today'
+  | 'startDay'
   | 'lengthDays'
   | 'proposals'
   | 'exceptions'
@@ -416,7 +441,14 @@ export interface Scenario {
   briefing: string;
   /** RELEX concepts this level teaches, shown in the tutorial. */
   teaches: string[];
+  /** Days the player plays, counted from takeover. */
   lengthDays: number;
+  /**
+   * Warm-up days played by the previous quartermaster before the player takes over (a multiple of 7, so
+   * takeover is a Monday). Default rules.warmup.days. Battle-plan days in content are relative to takeover;
+   * initGame shifts them by the warm-up.
+   */
+  warmupDays?: number;
   periodLengthDays: number;
   periodAllowance: number;
   initial: Omit<GameState, RuntimeField> & {
@@ -558,6 +590,8 @@ export interface VendorStats {
   customTrigger: boolean;
   /** Distinct items this vendor can supply (sourcing rules). */
   itemsSupplied: number;
+  /** Set when this row is an internal DC transfer lane, not an outside supplier. */
+  dcDepotId?: DepotId;
   ordersPlaced: number;
   unitsOrdered: number;
   spend: number;

@@ -155,3 +155,9 @@ export function selectVendorRows(game: GameState): VendorStats[] {
 export function selectVendorOrderDays(game: GameState, vendorId: VendorId): Weekday[] {
   return engine.effectiveOrderDays(game, vendorId);
 }
+
+/** Campaign progress from the player's point of view: day N of M since taking command. */
+export function selectCampaignDay(game: GameState) {
+  const total = game.lengthDays - game.startDay;
+  return { day: Math.min(total, game.today - game.startDay + 1), total, inheritedDays: game.startDay };
+}

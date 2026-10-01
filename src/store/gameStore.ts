@@ -19,7 +19,7 @@ import { loadMarketSeries, snapshotSeries, toMarketSignal, type MarketSeries } f
 
 export const SAVE_KEY = 'quartermaster-save';
 /** Bump when GameState changes shape; older saves are discarded. */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export interface DecisionEntry {
   decision: ProposalDecision;
@@ -72,12 +72,18 @@ export interface GameStore {
   quitGame(): void;
 }
 
+/** Warm-up days before the player takes over (scenario value or the rules default). */
+export function warmupDays(scenario: Scenario): number {
+  return scenario.warmupDays ?? rules.warmup.days;
+}
+
 export function isScenarioOver(scenario: Scenario | null, game: GameState | null): boolean {
-  return !!scenario && !!game && (game.status !== 'playing' || game.today >= scenario.lengthDays);
+  return !!scenario && !!game && (game.status !== 'playing' || game.today >= game.lengthDays);
 }
 
 function startGame(scenario: Scenario, difficulty: Difficulty, series: MarketSeries) {
-  const market = toMarketSignal(series, scenario.lengthDays);
+  // The market drives demand from day 0, so it must also cover the previous quartermaster's warm-up.
+  const market = toMarketSignal(series, warmupDays(scenario) + scenario.lengthDays);
   return { scenario, game: engine.initGame(scenario, { difficulty, market }), decisions: {}, starting: false };
 }
 
