@@ -79,8 +79,8 @@ interface ScenarioSpec {
   lengthDays: number;
   periodLengthDays: number;
   /**
-   * Period allowance as a multiple of expected base spend (no battle-plan uplift). Tuned so an
-   * accept-all player uses ~60–80% of it in levels I–VI and runs slightly over in level VII.
+   * Period allowance as a multiple of expected spend: base demand plus the actual battle-plan surges,
+   * averaged over the campaign, at the cheapest source. Rules.difficulty's budgetFactor applies on top.
    */
   allowanceFactor: number;
   vendorIds: VendorId[];
@@ -147,11 +147,22 @@ function buildScenario(s: ScenarioSpec): Scenario {
   const depots: Record<DepotId, Depot> = pick(DEPOTS, depotIds);
   const sourcing = scenarioSourcing(itemIds, s.vendorIds, s.lines);
 
-  let dailySpend = 0;
+  const battlePlans: BattlePlan[] = (s.battlePlanIds ?? []).map((id) => {
+    const p = BATTLE_PLANS_BY_ID[id];
+    if (!p) throw new Error(`content: unknown battle plan "${id}"`);
+    return p;
+  });
+
+  // Expected spend over the campaign: base demand plus the ACTUAL battle-plan surges (what a
+  // well-judged quartermaster has to buy), at the cheapest source.
+  let campaignSpend = 0;
   const locations: ItemLocation[] = s.lines.map((l) => {
     const spec: DemandSpec = { ...BASE_DEMAND[l.itemId], ...l.demand };
     const cheapest = Math.min(...sourcing.filter((r) => r.itemId === l.itemId).map((r) => r.unitCost));
-    dailySpend += spec.mean * cheapest;
+    const surgeDays = battlePlans
+      .filter((p) => p.depotIds.includes(l.depotId))
+      .reduce((sum, p) => sum + ((p.actualUplift[l.itemId] ?? 1) - 1) * (Math.min(p.end, s.lengthDays - 1) - p.start + 1), 0);
+    campaignSpend += spec.mean * cheapest * (s.lengthDays + surgeDays);
     return {
       itemId: l.itemId,
       depotId: l.depotId,
@@ -162,12 +173,7 @@ function buildScenario(s: ScenarioSpec): Scenario {
     };
   });
 
-  const periodAllowance = roundToTwoFigures(dailySpend * s.periodLengthDays * s.allowanceFactor);
-  const battlePlans: BattlePlan[] = (s.battlePlanIds ?? []).map((id) => {
-    const p = BATTLE_PLANS_BY_ID[id];
-    if (!p) throw new Error(`content: unknown battle plan "${id}"`);
-    return p;
-  });
+  const periodAllowance = roundToTwoFigures((campaignSpend / s.lengthDays) * s.periodLengthDays * s.allowanceFactor);
 
   return {
     id: s.id,
@@ -297,7 +303,7 @@ const tutorial: ScenarioSpec[] = [
     briefing:
       'The Ironhollow smith wants 250 silver of work before his mules climb to the pass, and his ' +
       'ORDER TRIGGER stands at 80%. A garrison\'s weekly need for shoes and mail rings comes to ' +
-      'about three-quarters of that, so NO PROPOSAL APPEARS. The need is real, but it is below the ' +
+      'about half of that, so NO PROPOSAL APPEARS. The need is real, but it is below the ' +
       'trigger. Watch the smithy\'s need-to-minimum ratio on the Proposals screen. Lower the trigger ' +
       'to let a smaller need build into a full order, or let the shortfall grow and pay for it in ' +
       'lame horses. The smith takes a week to deliver, so do not wait long.',
@@ -308,8 +314,8 @@ const tutorial: ScenarioSpec[] = [
     allowanceFactor: 1.3,
     vendorIds: ['mountain-smithy'],
     lines: [
-      { itemId: 'horseshoes', depotId: 'northern-pass', demand: { mean: 3 }, onHandDays: 10 },
-      { itemId: 'mail-rings', depotId: 'northern-pass', demand: { mean: 0.6 }, onHandDays: 12 },
+      { itemId: 'horseshoes', depotId: 'northern-pass', demand: { mean: 2 }, onHandDays: 12 },
+      { itemId: 'mail-rings', depotId: 'northern-pass', demand: { mean: 0.25 }, onHandDays: 16 },
     ],
   },
   {
@@ -338,7 +344,7 @@ const tutorial: ScenarioSpec[] = [
     briefing:
       "A letter: the Earl of Fennmarch's levies join the Eastern Camp on day 14 and stay to the end. " +
       'It gives no figures, so the system FORECAST cannot know, and it will keep proposing for ' +
-      'yesterday\'s army. Ask how many are coming (half again as many mouths, and thirstier), then ' +
+      'yesterday\'s army. Ask how many are coming (nearly twice the mouths, and twice the thirst), then ' +
       'enter a FORECAST OVERRIDE: a daily figure, or a total over the days, broken out in proportion ' +
       'to the baseline. An override IS the forecast, and orders follow it, until you delete it. ' +
       'Remember the lead time: the first carts must leave before the levies arrive.',
@@ -346,7 +352,7 @@ const tutorial: ScenarioSpec[] = [
     seed: 1808,
     lengthDays: 35,
     periodLengthDays: 35,
-    allowanceFactor: 1.35,
+    allowanceFactor: 1.25,
     vendorIds: ['abbey-granary', 'river-merchants', 'apothecary'],
     lines: [
       { itemId: 'grain', depotId: 'eastern-camp', onHandDays: 6 },
@@ -369,7 +375,7 @@ const tutorial: ScenarioSpec[] = [
     seed: 1909,
     lengthDays: 56,
     periodLengthDays: 28,
-    allowanceFactor: 1.1,
+    allowanceFactor: 1.2,
     vendorIds: ['abbey-granary', 'river-merchants', 'guild-fletchers', 'royal-armory', 'apothecary'],
     lines: [
       // Guild only: level VII already taught fallback sourcing; here the budget is about the letters.
@@ -408,7 +414,7 @@ const sandbox: ScenarioSpec = {
   seed: 9001,
   lengthDays: 112,
   periodLengthDays: 28,
-  allowanceFactor: 1.35,
+  allowanceFactor: 1.25,
   vendorIds: Object.keys(VENDORS),
   lines: sandboxLines,
   battlePlanIds: ['harrowmere-assault', 'feast-muster', 'winter-crossing', 'ford-feint'],

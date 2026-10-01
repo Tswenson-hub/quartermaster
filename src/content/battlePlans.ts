@@ -91,7 +91,7 @@ export const BATTLE_PLANS: BattlePlan[] = [
     depotIds: ['eastern-camp'],
     // No figures in the letter, so the system forecast gets no uplift. The player must override it.
     statedUplift: {},
-    actualUplift: { grain: 1.5, ale: 1.6, bandages: 1.3 },
+    actualUplift: { grain: 1.75, ale: 1.8, bandages: 1.4 },
   },
 ];
 
