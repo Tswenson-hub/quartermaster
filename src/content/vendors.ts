@@ -4,7 +4,9 @@ import type { Vendor, VendorId } from '../engine/types';
  * Suppliers to the army. Weekdays: 0 = Monday … 6 = Sunday.
  *
  * `reliability` is the chance a delivery arrives on time and in full (1 = never fails).
- * `minimum.surcharge` is the flat silver fee for accepting an order below the minimum.
+ * `orderTrigger` (vendors with a minimum): fraction of the minimum the real must-order need must reach
+ * before the system builds the order up to the minimum, one pack at a time (RELEX_RULES §4). Below
+ * it, no proposal is made for that vendor. The player can change it per vendor.
  * Each vendor has a distinct order rhythm so D2 (the next order opportunity's delivery) differs.
  */
 const list: Vendor[] = [
@@ -22,7 +24,9 @@ const list: Vendor[] = [
     name: 'Worshipful Guild of Fletchers',
     orderDays: [1],
     leadTimeDays: 5,
-    minimum: { kind: 'units', amount: 120, surcharge: 15 },
+    minimum: { kind: 'units', amount: 120 },
+    // Builds readily: half a minimum of real need is enough to fill the order.
+    orderTrigger: 0.5,
     reliability: 0.9,
   },
   {
@@ -31,7 +35,10 @@ const list: Vendor[] = [
     name: 'Ironhollow Mountain Smithy',
     orderDays: [2],
     leadTimeDays: 7,
-    minimum: { kind: 'value', amount: 250, surcharge: 40 },
+    minimum: { kind: 'value', amount: 250 },
+    // High trigger: a garrison's weekly need (~75% of the minimum) will NOT fire at default —
+    // the player must lower it (or let need accumulate) to get the mules moving.
+    orderTrigger: 0.8,
     reliability: 0.8,
   },
   {
@@ -56,7 +63,8 @@ const list: Vendor[] = [
     name: 'Royal Armory of Kingsreach',
     orderDays: [4],
     leadTimeDays: 4,
-    minimum: { kind: 'value', amount: 400, surcharge: 60 },
+    minimum: { kind: 'value', amount: 400 },
+    orderTrigger: 0.6,
     reliability: 0.99,
   },
 ];
