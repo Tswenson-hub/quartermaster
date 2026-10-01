@@ -33,6 +33,7 @@ describe('order-trigger lesson rule', () => {
     ...base,
     id: 'trigger-lesson-fixture',
     teaches: [...base.teaches, 'order trigger'],
+    warmupDays: 0, // tests the trigger rule itself; a 500% warm-up would hand over an empty camp
     initial: {
       ...base.initial,
       vendors: Object.fromEntries(Object.entries(base.initial.vendors).map(([id, v]) => [id, { ...v, orderTrigger: 5 }])),
