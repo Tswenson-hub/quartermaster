@@ -1436,9 +1436,19 @@ input.edited {
   z-index: 1;
   margin: 0 0 8px;
 }
-.master-table td,
-.master-table th {
+.master-table td.num {
   white-space: nowrap;
+}
+.master-table th {
+  white-space: normal;
+  vertical-align: bottom;
+  padding: 4px 6px;
+}
+.master-table td {
+  padding: 6px;
+}
+.master-table .item-cell > span {
+  min-width: 7em;
 }
 .sort-btn {
   border: 0;
@@ -1473,7 +1483,7 @@ tr.clickable:focus-visible {
 }
 .order-days-cell select {
   margin-top: 4px;
-  max-width: 220px;
+  max-width: 170px;
 }
 .your-schedule {
   color: var(--royal);
@@ -1935,6 +1945,9 @@ tr.clickable:focus-visible {
     flex: none;
     flex-direction: row;
     overflow-x: auto;
+    /* scroll the tabs, never widen the page */
+    min-width: 0;
+    max-width: 100%;
     gap: 4px;
     padding-bottom: 4px;
   }

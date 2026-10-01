@@ -340,7 +340,7 @@ function VendorsTab() {
                   <td className="num" data-label="Items supplied">
                     {v.itemsSupplied}
                   </td>
-                  <td className="num" data-label="Orders">
+                  <td className="num" data-label="Orders" data-testid={`vendor-orders-${v.vendorId}`}>
                     {v.ordersPlaced}
                   </td>
                   <td className="num" data-label="Units">

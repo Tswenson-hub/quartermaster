@@ -110,7 +110,7 @@ function ItemDetail({ game, loc }: { game: GameState; loc: ItemLocation }) {
               <dt><Term k="minimumFill" /></dt>
               <dd>{fmtQty(params.minimumFill)}</dd>
               <dt><Term k="mop">MOP</Term> <span className="muted">larger of the two</span></dt>
-              <dd>{fmtQty(params.mustOrderPoint)}</dd>
+              <dd data-testid="planning-mop">{fmtQty(params.mustOrderPoint)}</dd>
               <dt><Term k="cop">COP</Term> <span className="muted">can order point</span></dt>
               <dd>{fmtQty(params.canOrderPoint)}</dd>
               <dt>Supplier</dt>
@@ -120,7 +120,7 @@ function ItemDetail({ game, loc }: { game: GameState; loc: ItemLocation }) {
               <dt><Term k="d1" /> <span className="muted">this wagon</span></dt>
               <dd>{fmtDay(params.d1)}</dd>
               <dt><Term k="d2" /> <span className="muted">next wagon</span></dt>
-              <dd>{fmtDay(params.d2)}</dd>
+              <dd data-testid="planning-d2">{fmtDay(params.d2)}</dd>
               <dt>Projected before D2 delivery</dt>
               <dd className={belowMop ? 'bad-text' : undefined}>{fmtQty(params.projectedAtD2)}</dd>
               <dt>Order-up-to</dt>
