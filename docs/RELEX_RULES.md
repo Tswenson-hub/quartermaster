@@ -32,7 +32,7 @@ Bring `proj[D2]` up to order-up-to level (default: MOP), then round to pack size
 ## 6. Vendor minimums
 If the vendor's total proposal < minimum (value or units):
 1. Add **can** items, ranked by lowest days of cover, until the minimum is met.
-2. If still short of the order trigger level, no order is created for the user to review, the user would need to raise the trigger level in order to build up an order. They may still decide not to accept the order.
+2. If still short of the order trigger level, no order is created for the user to review, the user would need to lower the trigger level in order to build up an order. They may still decide not to accept the order.
 
 
 ## 8. Forecast
