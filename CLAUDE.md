@@ -47,3 +47,8 @@ Several agents work in parallel, each in its own git worktree/branch. Only edit 
 - Games start in progress: `initGame` plays `scenario.warmupDays ?? rules.warmup.days` (multiple of 7) as the previous quartermaster, accepting every proposal, with no rank or letters. The player takes over on `GameState.startDay`; `lengthDays` = startDay + scenario.lengthDays. Content writes battle-plan days relative to takeover; the engine shifts them. The store sizes the market series to warm-up + length.
 - Every outside vendor's lead time is ≥ `rules.minVendorLeadTimeDays` (3).
 - A DC is a `Depot` with `kind: 'dc'`. Front depots buy from it through an internal "vendor" with `dcDepotId` (the transfer lane's order days and lead time); `SourcingRule.depotIds` scopes rules to locations. Transfers ship from DC stock (short-ship raises `dc-short`), cost nothing against the budget, and DC stock is cheaper to hold (`rules.dc.holdingCostFactor`). DC demand = depots' planned transfer orders (dependent demand).
+
+## Deployment
+- GitHub: https://github.com/Tswenson-hub/quartermaster (public). Live: https://quartermaster-flame.vercel.app
+- Vercel auto-deploys every push to `main` to production. Only the lead pushes, and only after the merge gate passes. Agent branches stay local.
+- `.vercelignore` keeps `assets/_raw/` (licensed raw packs) out of CLI uploads; never commit `_raw` or `.env*`.
