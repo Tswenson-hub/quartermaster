@@ -1,0 +1,6 @@
+assets/_raw
+node_modules
+dist
+test-results
+playwright-report
+.env*
