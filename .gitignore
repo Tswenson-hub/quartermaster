@@ -27,3 +27,8 @@ dist-ssr
 assets/_raw/
 test-results/
 playwright-report/
+
+# deployment / local env
+.vercel
+.env*
+!.env.example
